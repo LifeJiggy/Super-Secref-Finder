@@ -76,5 +76,5 @@ It can scan a target URL to find and analyze its linked JavaScript files, or sca
 ## Contact
 
     ArkhAngelLifeJiggy -
-    GITHUB:
-    https://github.com/LifeJiggy
+    X:
+    https://x.com/ArkhLifeJiggy
