@@ -2,8 +2,8 @@ import re
 
 SENSITIVE_PATTERNS = {
     # API Keys and Tokens
-    "api_key": r"\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|bearer)\s*[:=]\s*['\"]?([a-zA-Z0-9\-_]{20,64})['\"]?",
-    "aws_access_key_id": r"\bAKIA[0-9A-Z]{16}\b(?!\S)",
+    "api_key": r"(?i)\b(api[_-]?key|access[_-]?token|client[_-]?secret|bearer)\s*[:=]\s*['\"]?([a-zA-Z0-9\-_]{32,64})['\"]?",
+    "aws_access_key_id": r"\bAKIA[0-9A-Z]{16}\b", 
     "aws_secret_access_key": r"\b[A-Za-z0-9/\+]{40}\b(?!\S)",
     "aws_session_token": r"\bFQoGZXIvYXdzE[a-zA-Z0-9/\+]+\b",
     "google_api_key": r"\bAIza[0-9A-Za-z\-_]{35}\b(?!\S)",
@@ -21,7 +21,7 @@ SENSITIVE_PATTERNS = {
 
     # Credentials and Secrets
     "hardcoded_credential": r"\b(?:user(?:name)?|pass(?:word)?|cred(?:ential)?|secret)\s*[:=]\s*['\"]?([^\s\"']{6,})['\"]?",
-    "jwt_token": r"\beyJ[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_.+/=]{20,}\b",  # Tightened for valid JWT
+    "jwt_token": r"\b(?:eyJ|eyJhbGci)[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_.+/=]{20,}\b", # Improved JWT pattern
     "session_id": r"\b(?:session_id|sid|sess|phpsessid)\s*[:=]\s*['\"]?([\w-]{16,64})['\"]?",
     "client_id": r"\b(?:client[_-]?id|oauth[_-]?client)\s*[:=]\s*['\"]?([a-zA-Z0-9\-_]{16,64})['\"]?",
     "client_secret": r"\bclient[_-]?secret\s*[:=]\s*['\"]?([a-zA-Z0-9\-_]{16,64})['\"]?",
@@ -99,21 +99,41 @@ SENSITIVE_PATTERNS = {
     "user_subscription": r"\b(?:subscribe|unsubscribe|renewSubscription)\s*\(",
 }
 
-def validate_pattern(pattern_name, match_str):
-    """
-    Additional validation to reduce false positives.
-    """
-    if pattern_name == "hardcoded_credential":
-        return not re.search(r"password\s*:\s*[!0-9]|void|return|function", match_str, re.IGNORECASE)
+def extract_context(text, start, end, context_length=200): # Increased default context length
+    """Extract surrounding text for a match."""
+    start_context = max(0, start - context_length)
+    end_context = min(len(text), end + context_length)
+    return text[start_context:end_context].replace('\n', ' ').strip()
+
+
+def validate_pattern(pattern_name, match_str, text, match):
+    """Additional validation to reduce false positives."""
+
+    if pattern_name == "api_key":
+        # Check if the key is within a comment or a string literal
+        context = extract_context(text, match.start(), match.end())
+        if "//" in context or "/*" in context or '"' in context or "'" in context:
+            return False
+
+    elif pattern_name == "hardcoded_credential":
+        # Improved check for hardcoded credentials
+        context = extract_context(text, match.start(), match.end())
+        if "password" in context.lower() and re.search(r"password\s*:\s*[!0-9]", context, re.IGNORECASE):
+            return True # Likely a true positive if "password" is followed by special characters or numbers
+        return not re.search(r"void|return|function|const|let|var", context, re.IGNORECASE) # Reduce false positives
+
+
     elif pattern_name == "error_message":
         return re.search(r"(Exception|Error|Traceback|Stacktrace)\s*:?\s*[^\s\"']+\s*(?:at\s+[^\s\"']+|\([^)]+\))", match_str, re.IGNORECASE)
+
     elif pattern_name == "file_inclusion":
         return re.search(r"\.(js|php|py|html|css|txt|json|xml)$", match_str, re.IGNORECASE)
+
     elif pattern_name == "paypal_client_id":
         return len(match_str) in [38, 40, 60] and match_str.startswith("A")
+
     elif pattern_name == "mobile_appcenter_secret":
-        # Exclude known benign UUIDs (e.g., GitHub analytics or CookieLaw)
-        benign_uuids = [
+        benign_uuids = [ # Exclude known benign UUIDs
             "e8504c0e-76d8-4281-a0c5-06547e2242a4",
             "693d30c4-f1db-de12-46ee-1a30cf025e61",
             "bd4cff8d-7544-4d25-997c-7399dc325ab0",
@@ -121,10 +141,11 @@ def validate_pattern(pattern_name, match_str):
             "52e658ee-26cb-4051-879f-9ecff283eb62"
         ]
         return match_str not in benign_uuids
+
     elif pattern_name == "jwt_token":
-    
-    
-    
-        # Exclude SVG filenames or short tokens
-        return not re.search(r"\.svg$|\.png$|\.jpg$", match_str, re.IGNORECASE) and len(match_str) > 50
+        # Exclude SVG, PNG, JPG filenames or short tokens
+        return not re.search(r"\.(svg|png|jpg)$", match_str, re.IGNORECASE) and len(match_str) > 50
+
+    # Add more validation logic for other patterns as needed
+
     return True

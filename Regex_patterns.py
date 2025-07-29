@@ -1,3 +1,4 @@
+import logging
 import requests
 import re
 import threading
@@ -10,6 +11,12 @@ from colorama import Fore, Style, init
 from sensitive_patterns import SENSITIVE_PATTERNS, validate_pattern
 
 init(autoreset=True)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    handlers=[logging.FileHandler("app.log"),
+                              logging.StreamHandler()])
 
 def print_banner():
     print(Fore.CYAN + r"""
@@ -31,12 +38,16 @@ def print_banner():
     print(Fore.GREEN + "[*] Developed by: ArkhAngelLifeJiggy")
     print(Fore.YELLOW + "[*] GitHub:https://github.com/LifeJiggy")
     print(Fore.GREEN + "[*] Version: 6.0")
+
+
 def validate_url(url):
     try:
         parsed = urlparse(url)
-        return parsed.scheme in ('http', 'https') and parsed.netloc
+        # Allow for .js extensions in the URL
+        return (parsed.scheme in ('http', 'https') and parsed.netloc) or (parsed.scheme in ('http', 'https') and parsed.path.endswith('.js'))
     except Exception:
         return False
+
 
 def fetch_url(url, max_retries=10, timeout=36000):
     tries = 0
@@ -54,13 +65,14 @@ def fetch_url(url, max_retries=10, timeout=36000):
                 url = resp.headers['Location']
             else:
                 tries += 1
-                time.sleep(1)
+                time.sleep(1)                
         except Exception as e:
-            print(Fore.RED + f"[!] Fetch error for {url}: {e}")
+            logging.error(f"Fetch error for {url}: {e}")
             tries += 1
             time.sleep(1)
     return None, None
 
+            
 def extract_js_links(text, base_url):
     js_links = set()
     patterns = [
@@ -106,7 +118,7 @@ def extract_secrets(text, url, confidence_threshold=0.8):
             if confidence < confidence_threshold:
                 continue
 
-            if not validate_pattern(pattern_name, match_str):
+            if not validate_pattern(pattern_name, match_str, text, match):
                 with open("false_positives.log", "a", encoding="utf-8") as f:
                     f.write(f"{pattern_name}: {match_str}\n")
                 continue
@@ -150,9 +162,9 @@ def interactive_menu():
     print_banner()
     while True:
         try:
-            url = input(Fore.YELLOW + "Enter target URL: ").strip()
+            url = input(Fore.YELLOW + "Enter target URL or .js endpoint: ").strip()
             if not validate_url(url):
-                print(Fore.RED + "Invalid URL. Try again.")
+                print(Fore.RED + "Invalid URL or .js endpoint. Try again.")
                 continue
             threads = input(Fore.YELLOW + "Threads (1-600): ").strip()
             if not threads.isdigit() or not (1 <= int(threads) <= 600):
@@ -199,39 +211,37 @@ def main():
         lock = threading.Lock()
 
         # Scan main page
-        if verbose:
-            print(Fore.CYAN + "\n[!] Scanning main page...")
-        url_queue.put(url)
+        if url.endswith(".js"):
+            if verbose:
+                print(Fore.CYAN + f"\n[!] Scanning JavaScript file: {url}")
+            url_queue.put(url)  # Add .js file directly to queue
+        else:
+            if verbose:
+                print(Fore.CYAN + "\n[!] Scanning main page...")
+            url_queue.put(url)  # Add main URL to queue
+        
+            # Extract and scan JS links
+            text, final_url = fetch_url(url)
+            if text:
+                js_links = extract_js_links(text, final_url)
+                selected_js = select_js_links(js_links)
+                if selected_js:
+                    if verbose:
+                        print(Fore.CYAN + "\n[!] Scanning selected JavaScript files...")
+                    for js_url in selected_js:
+                        url_queue.put(js_url)
+                
+                
         thread_list = []
         for _ in range(threads):
             t = threading.Thread(target=worker, args=(url_queue, results, lock, delay, verbose))
             t.daemon = True
             thread_list.append(t)
             t.start()
+                
         url_queue.join()
         for t in thread_list:
-            t.join()
-
-        # Extract and scan JS links
-        text, final_url = fetch_url(url)
-        if text:
-            js_links = extract_js_links(text, final_url)
-            selected_js = select_js_links(js_links)
-            if selected_js:
-                if verbose:
-                    print(Fore.CYAN + "\n[!] Scanning selected JavaScript files...")
-                url_queue = queue.Queue()
-                for js_url in selected_js:
-                    url_queue.put(js_url)
-                thread_list = []
-                for _ in range(threads):
-                    t = threading.Thread(target=worker, args=(url_queue, results, lock, delay, verbose))
-                    t.daemon = True
-                    thread_list.append(t)
-                    t.start()
-                url_queue.join()
-                for t in thread_list:
-                    t.join()
+             t.join()
 
         # Output results
         if results:
