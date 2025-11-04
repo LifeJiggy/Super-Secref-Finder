@@ -23,29 +23,52 @@ It can scan a target URL to find and analyze its linked JavaScript files, or sca
 
 ## Installation
 
+### Option 1: Install from PyPI (Recommended)
+
+```bash
+pip install super-secref-finder
+```
+
+### Option 2: Install from Source
+
 1. **Clone the repository:**
 
    ```bash
    git clone https://github.com/LifeJiggy/Super-Secref-Finder.git
-
+   cd Super-Secref-Finder
    ```
 
 2. Install dependencies:
 
-   bash
+   ```bash
    pip install -r requirements.txt
+   ```
 
 3. (Optional) Create a virtual environment: It's recommended to use a virtual environment to manage dependencies.
-   bash
+
+   ```bash
    python3 -m venv .venv
    source .venv/bin/activate # On Linux/macOS
-   . venv\Scripts\activate # On Windows
+   .venv\Scripts\activate # On Windows
+   ```
 
-## Usage:
+## Usage
+
+### Using the Command Line Interface
+
+After installation, you can run the scanner from anywhere:
+
+```bash
+super-secref-finder https://example.com --threads 10 --delay 2 --verbose
+```
+
+### Using the Interactive Menu
 
 1. Run the scanner:
-   bash
+
+   ```bash
    python Regex_patterns.py
+   ```
 
 2. Follow the interactive menu:
 

@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "super-secref-finder"
+version = "6.0.0"
+description = "A powerful tool designed to perform regex pattern matching to identify sensitive information in various data sources."
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.8"
+authors = [
+    {name = "ArkhAngelLifeJiggy", email = "Bloomtonjovish@gmail.com"},
+]
+maintainers = [
+    {name = "ArkhAngelLifeJiggy", email = "Bloomtonjovish@gmail.com"},
+]
+keywords = ["security", "regex", "sensitive-data", "scanner"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "regex",
+    "requests",
+    "jsonschema",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+[project.urls]
+Homepage = "https://github.com/LifeJiggy/Super-Secref-Finder"
+Repository = "https://github.com/LifeJiggy/Super-Secref-Finder"
+Issues = "https://github.com/LifeJiggy/Super-Secref-Finder/issues"
+Changelog = "https://github.com/LifeJiggy/Super-Secref-Finder/blob/main/CHANGELOG.md"
+
+[project.scripts]
+super-secref-finder = "super_secref_finder.Regex_patterns:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["super_secref_finder*"]
+
+[tool.setuptools.package-data]
+src = ["*.txt", "*.md"]
