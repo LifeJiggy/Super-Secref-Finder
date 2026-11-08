@@ -69,3 +69,13 @@ desktop.ini
 # Historical local notes. This folder has contained live credentials in the past;
 # clean and review it before removing this ignore rule.
 Docs/
+
+# Benchmark scratch space. Results are committed; downloaded binaries and
+# ad-hoc scanner output are not.
+benchmarks/.tools/
+benchmarks/.ours/
+benchmarks/.detect*
+benchmarks/.cache/
+
+# The benchmark corpus is synthetic, so the dotenv fixture must be tracked.
+!benchmarks/corpus/.env

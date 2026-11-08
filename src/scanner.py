@@ -26,6 +26,7 @@ from .crawler import build_target_list
 from .entropy_scan import find_entropy_findings
 from .fetcher import _build_session, fetch_url
 from .filesystem import iter_local_sources
+from .gitleaks import load_gitleaks_rules
 from .github import (
     GitHubError,
     cleanup_repo,
@@ -38,7 +39,9 @@ from .gitscan import GitError, changed_files, iter_history_documents, repo_root,
 from .notify import send_notification
 from .output import save_findings
 from .patterns import get_rules
-from .plugins import discover_plugins, run_plugins
+from .plugins import discover_entrypoint_plugins, discover_plugins, run_plugins
+from .ratelimit import HostRateLimiter
+from .rotation import rotation_guidance
 from .rules import SEVERITY_RANK, Rule
 from .secret_validator import VALIDATORS, validate_secret
 from .validators import confidence_for, extract_context, validate_rule
@@ -79,6 +82,8 @@ def scan_text(
     per_rule = Counter()
 
     for rule in rules:
+        if not rule.matches_path(url):
+            continue
         if rule.compiled is None:
             try:
                 rule.compile()
@@ -90,6 +95,8 @@ def scan_text(
         for match in rule.compiled.finditer(text):
             value = rule.value_of(match).strip().strip("'\"")
             if not value:
+                continue
+            if rule.is_negative_match(value, match.group(0)):
                 continue
 
             if allowlist is not None and allowlist.is_ignored(rule.id, value, url):
@@ -125,11 +132,19 @@ def scan_text(
                 "line": line,
                 "column": column,
             }
+            rotation_url = rotation_guidance(rule.id, rule.category, rule.tags)
+            if rotation_url:
+                finding["rotation_url"] = rotation_url
+            if rule.fix:
+                finding["fix"] = rule.fix
             if cfg.show_context:
                 finding["context"] = extract_context(text, start, end)
             findings.append(finding)
 
     return dedupe_findings(findings)
+
+
+_GENERIC_RULE_IDS = {"generic_secret_assignment", "api_key"}
 
 
 def dedupe_findings(findings: List[dict]) -> List[dict]:
@@ -148,9 +163,21 @@ def dedupe_findings(findings: List[dict]) -> List[dict]:
             continue
         new_rank = SEVERITY_RANK.get(finding.get("severity", "info"), 0)
         old_rank = SEVERITY_RANK.get(current.get("severity", "info"), 0)
-        if new_rank > old_rank or (
-            new_rank == old_rank and finding.get("confidence", 0) > current.get("confidence", 0)
-        ):
+        if new_rank > old_rank:
+            best[key] = finding
+            continue
+        if new_rank < old_rank:
+            continue
+
+        # Same severity: prefer a specific rule (including imported Semgrep or
+        # native custom rules) over the generic assignment fallback.
+        new_generic = finding.get("type") in _GENERIC_RULE_IDS
+        old_generic = current.get("type") in _GENERIC_RULE_IDS
+        if old_generic and not new_generic:
+            best[key] = finding
+        elif new_generic and not old_generic:
+            continue
+        elif finding.get("confidence", 0) > current.get("confidence", 0):
             best[key] = finding
     return [best[key] for key in order]
 
@@ -163,19 +190,24 @@ def _normalize_plugin_findings(plugin_findings: List[dict], url: str, text: str)
         start = int(item.get("start", 0) or 0)
         end = int(item.get("end", start) or start)
         line, column = _line_col(text, start)
-        normalized.append({
+        category = item.get("category", "custom")
+        finding = {
             "type": item.get("type", "plugin_finding"),
             "value": str(item["value"]),
             "url": item.get("url", url),
             "confidence": round(float(item.get("confidence", 0.7)), 2),
             "severity": item.get("severity", "medium"),
-            "category": item.get("category", "custom"),
+            "category": category,
             "description": item.get("description", "Plugin finding"),
             "start": start,
             "end": end,
             "line": line,
             "column": column,
-        })
+        }
+        rotation_url = rotation_guidance(finding["type"], category)
+        if rotation_url:
+            finding["rotation_url"] = rotation_url
+        normalized.append(finding)
     return normalized
 
 
@@ -198,6 +230,15 @@ def _analyze(
     )
     findings.extend(_normalize_plugin_findings(plugin_findings, url, text))
 
+    for finding in findings:
+        if not finding.get("rotation_url"):
+            rotation_url = rotation_guidance(
+                finding.get("type", ""),
+                finding.get("category"),
+            )
+            if rotation_url:
+                finding["rotation_url"] = rotation_url
+
     return dedupe_findings(findings)
 
 
@@ -207,6 +248,7 @@ def _worker(
     results: list,
     lock: threading.Lock,
     session,
+    limiter: Optional[HostRateLimiter],
     rules: List[Rule],
     allowlist: Allowlist,
     prefetched: Dict[str, tuple],
@@ -230,7 +272,7 @@ def _worker(
             if cached is not None:
                 text, final_url = cached
             else:
-                text, final_url, _ = fetch_url(cfg, url, session)
+                text, final_url, _ = fetch_url(cfg, url, session, limiter=limiter)
 
             if not text:
                 logger.warning(f"Failed to fetch: {url}")
@@ -410,6 +452,9 @@ def _run_git_history(
             root,
             max_commits=cfg.git_history_depth,
             since=cfg.git_since,
+            from_ref=cfg.git_from,
+            to_ref=cfg.git_to,
+            author=cfg.git_author,
         ))
     except GitError as exc:
         logger.warning(f"Git history scan skipped: {exc}")
@@ -545,9 +590,10 @@ def _run_web(
     allowlist: Allowlist,
 ) -> List[dict]:
     session = _build_session(cfg)
+    limiter = HostRateLimiter(cfg.per_host_delay, cfg.per_host_concurrency)
 
     def fetch_fn(url: str, method: str = "GET"):
-        return fetch_url(cfg, url, session, method=method)
+        return fetch_url(cfg, url, session, method=method, limiter=limiter)
 
     crawl = build_target_list(cfg, fetch_fn=fetch_fn)
     targets = crawl.targets
@@ -588,7 +634,7 @@ def _run_web(
         thread = threading.Thread(
             target=_worker,
             args=(
-                cfg, url_queue, results, lock, session, rules, allowlist,
+                cfg, url_queue, results, lock, session, limiter, rules, allowlist,
                 crawl.prefetched, visited, counter, total,
             ),
             daemon=True,
@@ -635,6 +681,8 @@ def run_scan(cfg: ScanConfig) -> List[dict]:
         exclude_types=cfg.exclude_types,
         min_severity=cfg.min_severity,
         include_endpoints=cfg.include_endpoints,
+        gitleaks_files=cfg.gitleaks_configs,
+        semgrep_files=cfg.semgrep_configs,
     )
     logger.info(f"Loaded {len(rules)} detection rules")
     if not rules:
@@ -647,11 +695,18 @@ def run_scan(cfg: ScanConfig) -> List[dict]:
         + ", ".join(f"{name}={by_severity.get(name, 0)}" for name in SEVERITY_RANK)
     )
 
-    allowlist = load_allowlist(cfg.ignore_files, project_dir=os.getcwd())
+    allowlist = load_allowlist(
+        cfg.ignore_files,
+        project_dir=os.getcwd(),
+        include_default=cfg.use_default_ignore,
+    )
 
     if cfg.plugin_dir:
         loaded = discover_plugins(cfg.plugin_dir)
         logger.info(f"Loaded {len(loaded)} plugins")
+    if cfg.entrypoint_plugins:
+        loaded = discover_entrypoint_plugins()
+        logger.info(f"Loaded {len(loaded)} entry-point plugins")
 
     if cfg.github_repo or cfg.github_org or cfg.github_user:
         results = _run_github(cfg, rules, allowlist)

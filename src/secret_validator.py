@@ -31,6 +31,11 @@ _ALLOWED_HOSTS = {
     "huggingface.co",
     "registry.npmjs.org",
     "api.telegram.org",
+    "api.cloudflare.com",
+    "api.groq.com",
+    "openrouter.ai",
+    "api.replicate.com",
+    "api.cohere.com",
 }
 
 
@@ -231,6 +236,84 @@ def validate_telegram_bot_token(token: str) -> Dict:
     return {"valid": False, "reason": data.get("description", "invalid token")}
 
 
+def validate_cloudflare_token(token: str) -> Dict:
+    resp = _safe_request(
+        "GET",
+        "https://api.cloudflare.com/client/v4/user/tokens/verify",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    if resp is None:
+        return {"valid": None, "reason": "request failed"}
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {}
+    if resp.status_code == 200 and data.get("success"):
+        status = (data.get("result") or {}).get("status")
+        return {"valid": status == "active", "status": status}
+    return {"valid": False, "reason": f"HTTP {resp.status_code}"}
+
+
+def validate_groq_key(key: str) -> Dict:
+    resp = _safe_request(
+        "GET",
+        "https://api.groq.com/openai/v1/models",
+        headers={"Authorization": f"Bearer {key}"},
+    )
+    if resp is None:
+        return {"valid": None, "reason": "request failed"}
+    if resp.status_code == 200:
+        return {"valid": True, "reason": "key is active"}
+    return {"valid": False, "reason": f"HTTP {resp.status_code}"}
+
+
+def validate_openrouter_key(key: str) -> Dict:
+    resp = _safe_request(
+        "GET",
+        "https://openrouter.ai/api/v1/auth/key",
+        headers={"Authorization": f"Bearer {key}"},
+    )
+    if resp is None:
+        return {"valid": None, "reason": "request failed"}
+    if resp.status_code == 200:
+        try:
+            data = resp.json().get("data") or {}
+        except ValueError:
+            data = {}
+        return {"valid": True, "label": data.get("label"), "usage": data.get("usage")}
+    return {"valid": False, "reason": f"HTTP {resp.status_code}"}
+
+
+def validate_replicate_token(token: str) -> Dict:
+    resp = _safe_request(
+        "GET",
+        "https://api.replicate.com/v1/account",
+        headers={"Authorization": f"Token {token}"},
+    )
+    if resp is None:
+        return {"valid": None, "reason": "request failed"}
+    if resp.status_code == 200:
+        try:
+            data = resp.json()
+        except ValueError:
+            data = {}
+        return {"valid": True, "username": data.get("username"), "type": data.get("type")}
+    return {"valid": False, "reason": f"HTTP {resp.status_code}"}
+
+
+def validate_cohere_key(key: str) -> Dict:
+    resp = _safe_request(
+        "GET",
+        "https://api.cohere.com/v1/models",
+        headers={"Authorization": f"Bearer {key}"},
+    )
+    if resp is None:
+        return {"valid": None, "reason": "request failed"}
+    if resp.status_code == 200:
+        return {"valid": True, "reason": "key is active"}
+    return {"valid": False, "reason": f"HTTP {resp.status_code}"}
+
+
 def validate_aws_access_key(access_key_id: str, secret_key: Optional[str] = None) -> Dict:
     """AWS keys cannot be checked from an access-key ID alone."""
     if not secret_key:
@@ -280,6 +363,11 @@ VALIDATORS = {
     "huggingface_token": validate_huggingface_token,
     "npm_token": validate_npm_token,
     "telegram_bot_token": validate_telegram_bot_token,
+    "cloudflare_api_token": validate_cloudflare_token,
+    "groq_api_key": validate_groq_key,
+    "openrouter_api_key": validate_openrouter_key,
+    "replicate_api_token": validate_replicate_token,
+    "cohere_api_key": validate_cohere_key,
 }
 
 

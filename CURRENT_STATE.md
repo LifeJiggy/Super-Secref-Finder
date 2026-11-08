@@ -1,10 +1,10 @@
 # Super Secref Finder — Current State & v8 Upgrade Plan
 
-> **Audit date:** 2026-11-07
-> **Repo state:** `main` branch. The `src/` refactor is committed (`c4d05a5`); the v8.1 feature work, tests, docs, and distribution files are currently **unpushed**.
-> **Version in repo:** `8.1.0`
+> **Audit date:** 2026-11-08
+> **Repo state:** `main` branch. The last pushed commit before the v8.2/v8.3 work is `2a996c0`; the current release commit is pushed after final verification.
+> **Version in repo:** `8.3.0`
 > **Baseline version:** `8.0.0` — “Signal over noise”
-> **Current release:** `8.1.0` — live GitHub, git history, pre-commit, entropy, workflow audit
+> **Current release:** `8.3.0` — benchmarked scanner plus Semgrep/gitleaks/secretlint interoperability
 
 ---
 
@@ -214,16 +214,29 @@ But it is **not yet a powerful secret scanner**. The core detection layer is the
 - [x] Version bump to `8.1.0`; README/CHANGELOG/CURRENT_STATE updated.
 - [x] 91 passing tests and clean `ruff check src tests scripts examples`.
 
-### P2 — Remaining roadmap (next releases)
+### P2 — Remaining roadmap (completed in v8.2/v8.3)
 
-- [ ] Source-map and bundler chunk discovery / deeper JS AST analysis.
-- [ ] YAML rule packs compatible with gitleaks TOML import.
-- [ ] Web UI / dashboard mode (`--serve`).
-- [ ] Rate-limit scheduler per host and adaptive concurrency.
-- [ ] Secret rotation guidance links per rule.
-- [ ] Provider-side validation for more token types.
-- [ ] Commit-range and author filters for `--git-history`.
-- [ ] Plugin marketplace / rule contribution guide.
+- [x] Source-map and bundler chunk discovery / deeper JS AST analysis.
+- [x] YAML rule packs compatible with gitleaks TOML import (plus a Semgrep regex subset).
+- [x] Web UI / dashboard mode (`--serve`).
+- [x] Rate-limit scheduler per host and adaptive concurrency.
+- [x] Secret rotation guidance links per rule.
+- [x] Provider-side validation for more token types.
+- [x] Commit-range and author filters for `--git-history`.
+- [x] Plugin marketplace / rule contribution guide.
+
+### v8.3.0 — Interoperability and proof
+
+- [x] `--semgrep-config` imports `pattern-regex`, `pattern-either`,
+  `pattern-not-regex`, `paths.include`/`exclude`, metadata, severity, and `fix`.
+- [x] Path-scoped custom rules (`paths.include` / `paths.exclude`).
+- [x] Negative patterns (`pattern_not` / `pattern-not-regex`).
+- [x] Cross-tool suppression comments: `secref:ignore`, `gitleaks:allow`,
+  `trufflehog:ignore`, `secretlint-disable-line`,
+  `secretlint-disable-next-line`, `pragma: allowlist secret`, and `nosec`.
+- [x] Benchmark harness against gitleaks, trufflehog, detect-secrets,
+  secretlint, and whispers, with JSON and Markdown results.
+- [x] 119 passing tests and clean `ruff check src tests scripts examples`.
 
 ---
 
@@ -232,7 +245,7 @@ But it is **not yet a powerful secret scanner**. The core detection layer is the
 1. Running the scanner on the real `robinhood.com` sample returns **0 secret findings by default** (no `inline_script`, no UUID, no `../`).
 2. A fixture containing AWS/OpenAI/GitHub/private-key/DB-URI/JWT samples returns **all of them** with correct severity.
 3. Placeholder values (`your_api_key_here`, `AKIAIOSFODNN7EXAMPLE`, `changeme`) are rejected.
-4. `pytest` passes (currently **91 tests**) and `ruff check src tests scripts examples` is clean.
+4. `pytest` passes (currently **119 tests**) and `ruff check src tests scripts examples` is clean.
 5. `--fail-on high` exits `1` when a high finding exists and `0` otherwise.
 6. `--path .` scans local files and emits JSON/HTML/SARIF/JUnit.
 7. `--github owner/repo` scans a live public repository and reports `github://` URLs.
@@ -244,6 +257,18 @@ But it is **not yet a powerful secret scanner**. The core detection layer is the
 13. Webhook payloads are redacted and filtered by `--webhook-min-severity`.
 14. README, `--help`, and output formats describe the actual behavior.
 15. The project’s own scan returns 0 findings by default (`.secrefignore` excludes synthetic test fixtures).
+
+### v8.3 acceptance criteria
+
+1. `--semgrep-config` imports `pattern-regex`, `pattern-either`, and
+   `pattern-not-regex` rules and preserves severity/category metadata.
+2. `paths.include` and `paths.exclude` restrict matches to the expected files.
+3. `pattern_not` / `pattern-not-regex` suppresses placeholder matches.
+4. All supported inline suppression comments suppress only the intended line.
+5. `--no-default-ignore` bypasses `.secrefignore`.
+6. `benchmarks/run_benchmark.py` writes JSON and Markdown results, and missing
+   tools are reported without aborting the run.
+7. `pytest` passes and `ruff check src tests scripts examples` is clean.
 
 ---
 
@@ -260,6 +285,8 @@ python -m src --github-user octocat --github-limit 2 --safe-mode
 python -m src --path . --git-history --git-history-depth 20
 python -m src --path . --audit-github-actions --format sarif
 python -m src --path . --entropy-scan --format junit
+python -m src --path . --semgrep-config vendor/semgrep.yml
+python benchmarks/run_benchmark.py --tools super-secref-finder detect-secrets
 ```
 
 ---
@@ -275,7 +302,13 @@ New:
 - `src/notify.py` — redacted webhook notifications
 - `src/allowlist.py` — `.secrefignore`, fingerprints, placeholder engine, auto-allowlist writer
 - `src/filesystem.py` — local file/stdin scanning
-- `tests/` — 91 unit/integration tests
+- `src/gitleaks.py` — gitleaks TOML rule importer
+- `src/semgrep.py` — Semgrep YAML regex-subset importer
+- `src/server.py` — read-only report dashboard
+- `src/ratelimit.py` — per-host scheduler and adaptive backoff
+- `src/rotation.py` — provider rotation guidance
+- `benchmarks/` — synthetic corpus, five-scanner harness, results
+- `tests/` — 119 unit/integration tests
 - `.github/workflows/ci.yml`, `.github/workflows/release.yml`
 - `action.yml`, `.pre-commit-hooks.yaml`
 - `.secrefignore`
@@ -289,12 +322,15 @@ Rewritten / upgraded:
 
 ---
 
-## 8. Final v8.1 verification
+## 8. Final v8.3 verification
 
 | Check | Result |
 |---|---|
-| `pytest -q` | **91 passed** |
+| `pytest -q` | **119 passed** |
 | `ruff check src tests scripts examples` | **clean** |
+| Semgrep import (`tests/test_semgrep.py`) | regex, either, negative, path filters, metadata verified |
+| Cross-tool suppression comments | gitleaks, secretlint, detect-secrets, Bandit, trufflehog markers verified |
+| Benchmark harness | `super-secref-finder` 14 TP / 0 FP / 2 FN; `detect-secrets` 11 TP / 2 FP / 5 FN |
 | Self-scan `python -m src --path . --format json -q` | **0 findings** |
 | Live GitHub repo `octocat/Hello-World` | **0 findings**, source `github`, target resolved |
 | Live GitHub user discovery (`octocat`, limit 2) | **completed**, target `user:octocat` |
@@ -309,3 +345,5 @@ Rewritten / upgraded:
 - Zipball scans do not include `.git`; combine `--github` with `--git-history` to clone and scan history.
 - `--entropy-scan` and `--include-noise` are intentionally opt-in because they trade signal for coverage.
 - Active validation remains allow-listed and read-only. AWS access-key-ID-only validation is not auto-run because it cannot be verified without the paired secret.
+- The published benchmark snapshot currently scores Super Secref Finder and detect-secrets. gitleaks, trufflehog, secretlint, and whispers are reported as `not installed`; install them with the commands in `benchmarks/README.md` and rerun the harness to fill those rows. Corpus values are base64-encoded in `benchmarks/secrets.b64.json` and materialized into a temporary directory at runtime, so secret-shaped strings are not committed.
+- Semgrep import is deliberately limited to the regex subset. AST-only predicates are skipped with a warning instead of approximated.

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "super-secref-finder"
-version = "8.1.0"
-description = "High-signal secret scanner for web apps, JavaScript bundles, and local files — 128 rules, severity, SARIF, CI exit codes."
+version = "8.3.0"
+description = "High-signal secret scanner for web apps, GitHub repos, git history, and CI — 128 rules, source maps, SARIF, and live validation."
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.8"
@@ -41,6 +41,7 @@ dependencies = [
     "requests>=2.28.0",
     "colorama>=0.4.6",
     "pyyaml>=6.0",
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]

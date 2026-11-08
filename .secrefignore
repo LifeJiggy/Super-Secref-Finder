@@ -3,3 +3,5 @@
 path: */tests/*
 path: */examples/*
 path: */Docs/*
+path: */benchmarks/*
+path: benchmarks/*

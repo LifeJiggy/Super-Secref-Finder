@@ -11,14 +11,14 @@
 
 Most regex secret scanners are noisy. They flag every 32-character string, every UUID,
 every `<script>` tag, and every `../` path, then leave you to triage hundreds of
-non-findings. **Super Secref Finder v8.1 is built around one rule: signal over noise.**
+non-findings. **Super Secref Finder v8.3 is built around one rule: signal over noise.**
 
 It scans live GitHub repositories and organizations, git history, staged changes,
 web pages, linked JavaScript, local repositories, and stdin — but only reports
 findings that have a plausible secret shape, context, and severity. Code smells,
 PII, generic entropy, and endpoint discovery are opt-in.
 
-**Current version:** `8.1.0` — see [CHANGELOG.md](CHANGELOG.md).
+**Current version:** `8.3.0` — see [CHANGELOG.md](CHANGELOG.md).
 
 ```text
 $ secref --path . --min-severity high
@@ -30,18 +30,18 @@ CRITICAL  database_uri_with_credentials  src/.env:4
 
 ---
 
-## Why v8.1 is different
+## Why v8.3 is different
 
-| Problem in v7 | What v8.1 does |
+| Problem in v7 | What v8.3 does |
 |---|---|
 | 35 findings, 0 real secrets on a real site | 79 curated default rules; broad UUID/32-char rules rewritten with context |
 | `inline_script`, `path_traversal`, `console.log` in every report | Code smells moved behind `--include-noise` |
 | `match.group(0)` stored the whole `key = "value"` line | Rules capture the actual secret group |
 | No severity, category, or rule metadata | Every rule has `severity`, `category`, `description`, tags |
-| No way to suppress accepted risks | `.secrefignore`, inline `secref:ignore`, `--ignore-file` |
+| No way to suppress accepted risks | `.secrefignore`, `secref:ignore`, and gitleaks/secretlint/detect-secrets/Bandit suppression comments |
 | No CI behaviour | `--fail-on` exit codes and SARIF output |
 | Only scanned URLs | `--path .` and `--path -` for local files and stdin |
-| No tests, CI, or container | 91 pytest tests, GitHub Actions matrix, Docker image |
+| No tests, CI, or container | 119 pytest tests, GitHub Actions matrix, Docker image |
 
 ---
 
@@ -59,8 +59,12 @@ CRITICAL  database_uri_with_credentials  src/.env:4
   repository and report commit/author provenance.
 - **Git history and pre-commit modes** - `--git-history`, `--staged`, and
   `--changed` catch secrets that were committed or are about to be committed.
-- **Web and JavaScript scanning** - crawl links, discover JS bundles, respect scope,
-  robots.txt, exclusions, and request delays.
+- **Web and JavaScript scanning** - crawl links, discover JS bundles, source
+  maps, and quoted chunks, with scope, robots.txt, exclusions, and request delays.
+- **Per-host scheduling** - `--per-host-delay` and `--per-host-concurrency`
+  prevent one host from being hammered; 429 responses adaptively back off.
+- **Rotation guidance** - every provider credential finding includes a
+  `rotation_url` linking to the provider's revoke/rotate page.
 - **Entropy and workflow audit** - opt-in generic high-entropy detection and
   GitHub Actions supply-chain checks (unpinned actions, unsafe checkouts,
   script injection, `write-all`, inherited secrets).
@@ -69,12 +73,16 @@ CRITICAL  database_uri_with_credentials  src/.env:4
 - **CI-first output** - JSON, JSONL, CSV, Markdown, HTML dashboard, SARIF, and
   JUnit XML. `--fail-on high` makes the scan a quality gate.
 - **Allowlist engine** - ignore by rule, value, path, URL, or hashed
-  fingerprint; inline suppression with `# secref:ignore`; generate a precise
-  allowlist with `--write-ignore`.
+  fingerprint; inline suppression for `secref:ignore`, `gitleaks:allow`,
+  `secretlint-disable-line`, `pragma: allowlist secret`, and `nosec`; generate
+  a precise allowlist with `--write-ignore`.
 - **Differential scans** - store a hashed baseline and report only new findings.
+- **Report dashboard** - `--serve` starts a local read-only report browser.
 - **Webhook notifications** - post a redacted summary to Slack, Discord, or a
   generic endpoint.
-- **Custom rules and plugins** - YAML/JSON rule files and a Python plugin API.
+- **Custom rules and plugins** - YAML/JSON rule files, gitleaks TOML import,
+  Semgrep-compatible YAML import (regex subset), and a Python plugin API with
+  installed entry-point discovery.
 - **Safe by default** - live validation is allow-listed, read-only, and can be
   disabled with `--safe-mode`.
 
@@ -94,7 +102,8 @@ cd Super-Secref-Finder
 pip install -e ".[dev]"
 ```
 
-Requirements: Python 3.8+, `requests`, `colorama`, `pyyaml`.
+Requirements: Python 3.8+, `requests`, `colorama`, `pyyaml` (and `tomli` on
+Python < 3.11 for gitleaks TOML import).
 
 ---
 
@@ -137,9 +146,39 @@ secref --github-user octocat --github-limit 10
 
 ```bash
 secref --path . --git-history --git-history-depth 200
+secref --path . --git-history --git-from v8.0.0 --git-to HEAD --git-author Alice
 secref --staged --fail-on high
 secref --changed
 ```
+
+### Discover source maps and bundler chunks
+
+```bash
+secref https://example.com --depth 2 --source-maps
+```
+
+### Serve a local report dashboard
+
+```bash
+secref --path . --format html --serve --open-browser
+```
+
+### Import rules from gitleaks
+
+```bash
+secref --path . --gitleaks-config vendor/gitleaks.toml
+```
+
+### Import regex rules from Semgrep
+
+```bash
+secref --path . --semgrep-config vendor/semgrep-secrets.yml
+```
+
+The importer supports `pattern-regex`, `pattern-either`, `pattern-not-regex`,
+`paths.include`/`paths.exclude`, `metadata.category`, `metadata.tags`,
+`metadata.entropy`, and `fix` suggestions. AST-only Semgrep predicates are
+skipped with a warning instead of producing approximate matches.
 
 ### Audit GitHub Actions workflows
 
@@ -189,6 +228,8 @@ python Regex_patterns.py
 | Staged files | `secref --staged` |
 | Modified files | `secref --changed` |
 | Git history | `secref --path . --git-history` |
+| Commit range / author | `secref --path . --git-history --git-from v8.0.0 --git-author Alice` |
+| Source maps/chunks | `secref https://example.com --source-maps` |
 
 Local scans skip common noise automatically: `.git`, `node_modules`, `venv`,
 `dist`, `build`, `__pycache__`, images, archives, binaries, oversized files, and
@@ -285,7 +326,20 @@ Suppress a single line inline:
 EXAMPLE_TOKEN = "ghp_..."  # secref:ignore
 ```
 
-Use another file with `--ignore-file path/to/ignore`.
+The scanner also understands the suppression comments teams already use:
+
+```python
+EXAMPLE = "..."  # gitleaks:allow
+EXAMPLE = "..."  # secretlint-disable-line
+EXAMPLE = "..."  # pragma: allowlist secret
+EXAMPLE = "..."  # nosec
+# secretlint-disable-next-line
+EXAMPLE = "..."
+```
+
+Use another file with `--ignore-file path/to/ignore`. Pass
+`--no-default-ignore` when a scan must not inherit the current directory's
+`.secrefignore` (the benchmark harness uses this).
 
 Generate a precise allowlist from the current findings:
 
@@ -310,6 +364,10 @@ patterns:
     category: secret
     group: 1
     entropy: 3.0
+    paths:
+      include: ["src/**"]
+      exclude: ["tests/**"]
+    pattern_not: "example|placeholder"
 ```
 
 ```bash
@@ -318,6 +376,27 @@ secref --path . --custom-patterns custom_patterns.yaml
 
 See [`src/custom_patterns_example.yaml`](src/custom_patterns_example.yaml) for the
 full schema. Simple `name: regex` entries still work.
+
+Existing gitleaks rule packs can be imported directly:
+
+```bash
+secref --path . --gitleaks-config vendor/gitleaks.toml
+```
+
+The importer supports `id`, `description`, `regex`, `secretGroup`, `entropy`, and
+`tags`, and skips unsupported or invalid entries with a warning.
+
+Semgrep regex rules can be imported too:
+
+```bash
+secref --path . --semgrep-config vendor/semgrep-secrets.yml
+```
+
+Supported: `pattern-regex`, `pattern-either`, `pattern-not-regex`,
+`paths.include`/`paths.exclude`, `metadata.category`, `metadata.tags`, and
+`fix`. AST-only predicates (`pattern`, `pattern-inside`, `metavariable-regex`,
+taint mode) are skipped with a warning because a regex scanner cannot faithfully
+evaluate them.
 
 ---
 
@@ -348,6 +427,10 @@ Built-in plugins cover Firebase configuration, S3 bucket references, API
 discovery, and hardcoded IP addresses. API discovery and hardcoded-IP results
 are opt-in with `--include-endpoints` or `--include-noise`.
 
+Installed plugin packages can expose a `secref.plugins` entry point; load them
+with `--entrypoint-plugins`. See [PLUGINS.md](PLUGINS.md) for the plugin API,
+gitleaks import, marketplace convention, and contribution checklist.
+
 ---
 
 ## Output formats
@@ -363,9 +446,19 @@ are opt-in with `--include-endpoints` or `--include-noise`.
 | JUnit XML | `--format junit` | Jenkins/GitLab/Azure test reporters |
 
 Every finding includes `type`, `value`, `url`, `severity`, `category`,
-`confidence`, `validated`, `line`, `column`, and optional `context`. Findings
-from GitHub/history scans also include `source`, `repo`, `commit`, `author`, and
-`commit_date` when available. Use `--redact` to mask values in output.
+`confidence`, `validated`, `line`, `column`, `rotation_url` (when a provider
+rotation page is known), and optional `context`. Findings from GitHub/history
+scans also include `source`, `repo`, `commit`, `author`, and `commit_date` when
+available. Use `--redact` to mask values in output.
+
+Serve the generated reports locally:
+
+```bash
+secref --path . --format html --serve --serve-port 8000
+```
+
+The server is read-only, binds to `127.0.0.1` by default, and refuses path
+traversal outside the output directory.
 
 ---
 
@@ -394,7 +487,7 @@ jobs:
           args: "--min-severity medium"
 ```
 
-> The action currently tracks `main` because `v8.1.0` is not tagged yet. Once a
+> The action currently tracks `main` because `v8.3.0` is not tagged yet. Once a
 > release tag exists, pin the action to that tag for reproducible CI.
 
 Or run the CLI directly:
@@ -425,7 +518,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/LifeJiggy/Super-Secref-Finder
-    rev: main  # replace with v8.1.0 once the release tag is published
+    rev: main  # replace with v8.3.0 once the release tag is published
     hooks:
       - id: secref
       - id: secref-workflow-audit
@@ -496,23 +589,31 @@ Run `secref --list-rules` or open [RULES.md](RULES.md) for the full table.
 
 ## How it compares
 
-| Capability | Super Secref Finder v8.1 | gitleaks | trufflehog | detect-secrets |
+| Capability | Super Secref Finder v8.3 | gitleaks | trufflehog | detect-secrets |
 |---|---|---|---|---|
 | Local files/directories | Yes | Yes | Yes | Yes |
 | Live GitHub repo/org scanning | Yes | No | Yes | No |
 | Web pages + JS crawling | Yes | No | No | No |
+| Source-map / chunk discovery | Yes | No | No | No |
 | Staged/changed pre-commit mode | Yes | Yes | Partial | Yes |
 | Git history scanning | Yes | Yes | Yes | No |
+| History commit-range/author filters | Yes | Partial | No | No |
 | Whole-file entropy scan | Yes (opt-in) | Yes | Yes | Partial |
 | GitHub Actions workflow audit | Yes | Partial | No | No |
+| Gitleaks TOML import | Yes | Native | No | No |
+| Semgrep YAML regex import | Yes | No | No | No |
+| Path-scoped custom rules | Yes | Partial | No | Yes |
 | Rule severity/category | Yes | Yes | Partial | Partial |
 | Allowlist + inline ignore | Yes | Yes | Partial | Yes |
+| Cross-tool suppression comments | Yes | Partial | Partial | Partial |
 | Fingerprint allowlists | Yes | No | No | No |
+| Rotation guidance per finding | Yes | No | Partial | No |
+| Per-host rate limiting | Yes | Yes | Yes | No |
 | CI exit codes | Yes | Yes | Partial | Yes |
 | SARIF / JUnit | Yes | SARIF | SARIF | Partial |
-| HTML dashboard | Yes | No | No | No |
-| Custom YAML/JSON rules | Yes | TOML | No | Yes |
-| Plugin API | Yes | Yes | Yes | Partial |
+| HTML dashboard / local server | Yes | No | No | No |
+| Custom YAML/JSON/Semgrep rules | Yes | TOML | No | Yes |
+| Plugin API / entry points | Yes | Yes | Yes | Partial |
 | Live validation | Yes (allow-listed) | Partial | Yes | No |
 
 Super Secref Finder combines working-tree, web/JS, GitHub, history, and
@@ -538,19 +639,26 @@ src/
   filesystem.py        # Local file/dir/stdin scanning
   github.py            # Live repo download, org/user discovery, safe unzip
   gitscan.py           # Staged/changed files + git history documents
+  gitleaks.py          # Gitleaks TOML rule importer
+  semgrep.py           # Semgrep YAML regex-subset importer
+  sourcemaps.py        # sourceMappingURL + bundler chunk discovery
   workflow_audit.py    # GitHub Actions supply-chain checks
+  ratelimit.py         # Per-host delay/concurrency + adaptive backoff
+  rotation.py          # Provider rotation guidance per rule
   fetcher.py           # HTTP session, retries, proxies, size limits
   crawler.py           # BFS crawling, JS discovery, robots, scope
   scanner.py           # Orchestration, dedupe, validation, exit codes
   output.py            # JSON/JSONL/CSV/MD/HTML/SARIF/JUnit writers
+  server.py            # Read-only local report dashboard (--serve)
   checkpoint.py        # Resume + hashed differential baselines
   notify.py            # Redacted Slack/Discord/generic webhooks
   plugins.py           # Plugin registry + built-in plugins
   secret_validator.py  # Allow-listed read-only token validation
   logging_config.py    # Rotating logs + separate audit logger
   interactive.py       # Guided prompts
-tests/                 # 91 pytest tests
+tests/                 # 119 pytest tests
 scripts/               # Rule documentation generator
+benchmarks/            # Reproducible comparison against five scanners
 action.yml             # Composite GitHub Action with SARIF upload
 ```
 
@@ -572,12 +680,22 @@ The CI workflow runs the test suite on Python 3.8-3.13 and a lint pass.
 
 ## Roadmap
 
-- [ ] Source-map and bundler chunk discovery
-- [ ] gitleaks TOML rule import
-- [ ] `--serve` web dashboard
-- [ ] Per-host rate-limit scheduler and adaptive concurrency
-- [ ] Secret rotation guidance links per rule
-- [ ] Provider-side validation for more token types
+- [x] Source-map and bundler chunk discovery
+- [x] Gitleaks TOML rule import
+- [x] `--serve` web dashboard
+- [x] Per-host rate-limit scheduler and adaptive concurrency
+- [x] Secret rotation guidance links per rule
+- [x] Provider-side validation for more token types
+- [x] Commit-range and author filters for `--git-history`
+- [x] Plugin marketplace / rule contribution guide
+- [x] Semgrep-compatible YAML regex rule import
+- [x] Path-scoped custom rules and negative patterns
+- [x] Cross-tool inline suppression comments (gitleaks, secretlint, detect-secrets, Bandit)
+- [x] Reproducible benchmark harness and published results
+
+See [`benchmarks/`](benchmarks/) for the reproducible comparison harness and
+[`benchmarks/results/latest.md`](benchmarks/results/latest.md) for the current
+result snapshot.
 
 ---
 

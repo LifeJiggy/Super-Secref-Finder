@@ -1,0 +1,519 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-11-08T15:18:17.999432+00:00",
+  "corpus": {
+    "path": "benchmarks/corpus",
+    "files": 5,
+    "secrets": 16,
+    "clean_files": 2,
+    "file_list": [
+      ".env",
+      "app/config.py",
+      "clean/clean.py",
+      "clean/README.md",
+      "web/app.js"
+    ],
+    "materialized_at_runtime": true
+  },
+  "environment": {
+    "platform": "Windows-11-10.0.22621-SP0",
+    "python": "3.14.6"
+  },
+  "methodology": "Corpus placeholders are materialized from base64-encoded synthetic values in a temporary directory. Unique file/line detections are compared with ground truth. A value fallback matches findings whose reported line shifted. Extra unique findings are false positives; multiple hits on one line count once.",
+  "tools": [
+    {
+      "name": "super-secref-finder",
+      "status": "ok",
+      "available": true,
+      "version": "super-secref-finder 8.3.0",
+      "command": "python -m src --path <corpus> --format json --safe-mode --no-default-ignore -q -o <report>",
+      "runtime_seconds": 0.85,
+      "returncode": 0,
+      "error": null,
+      "total_detections": 14,
+      "unique_detections": 14,
+      "tp": 14,
+      "fp": 0,
+      "fn": 2,
+      "duplicates": 0,
+      "precision": 1.0,
+      "recall": 0.875,
+      "f1": 0.9333,
+      "matched": [
+        {
+          "truth": {
+            "file": ".env",
+            "line": 1,
+            "rule": "sendgrid_api_key"
+          },
+          "detection": {
+            "file": ".env",
+            "line": 1,
+            "rule": "sendgrid_api_key"
+          }
+        },
+        {
+          "truth": {
+            "file": ".env",
+            "line": 2,
+            "rule": "gitlab_token"
+          },
+          "detection": {
+            "file": ".env",
+            "line": 2,
+            "rule": "gitlab_token"
+          }
+        },
+        {
+          "truth": {
+            "file": ".env",
+            "line": 3,
+            "rule": "npm_token"
+          },
+          "detection": {
+            "file": ".env",
+            "line": 3,
+            "rule": "npm_token"
+          }
+        },
+        {
+          "truth": {
+            "file": ".env",
+            "line": 4,
+            "rule": "twilio_api_key"
+          },
+          "detection": {
+            "file": ".env",
+            "line": 4,
+            "rule": "twilio_api_key"
+          }
+        },
+        {
+          "truth": {
+            "file": "app/config.py",
+            "line": 3,
+            "rule": "aws_access_key_id"
+          },
+          "detection": {
+            "file": "app/config.py",
+            "line": 3,
+            "rule": "aws_access_key_id"
+          }
+        },
+        {
+          "truth": {
+            "file": "app/config.py",
+            "line": 5,
+            "rule": "github_token"
+          },
+          "detection": {
+            "file": "app/config.py",
+            "line": 5,
+            "rule": "github_token"
+          }
+        },
+        {
+          "truth": {
+            "file": "app/config.py",
+            "line": 6,
+            "rule": "openai_api_key"
+          },
+          "detection": {
+            "file": "app/config.py",
+            "line": 6,
+            "rule": "openai_api_key"
+          }
+        },
+        {
+          "truth": {
+            "file": "app/config.py",
+            "line": 7,
+            "rule": "digitalocean_personal_access_token"
+          },
+          "detection": {
+            "file": "app/config.py",
+            "line": 7,
+            "rule": "digitalocean_personal_access_token"
+          }
+        },
+        {
+          "truth": {
+            "file": "app/config.py",
+            "line": 8,
+            "rule": "database_uri_with_credentials"
+          },
+          "detection": {
+            "file": "app/config.py",
+            "line": 8,
+            "rule": "database_uri_with_credentials"
+          }
+        },
+        {
+          "truth": {
+            "file": "web/app.js",
+            "line": 1,
+            "rule": "google_api_key"
+          },
+          "detection": {
+            "file": "web/app.js",
+            "line": 1,
+            "rule": "google_api_key"
+          }
+        },
+        {
+          "truth": {
+            "file": "web/app.js",
+            "line": 2,
+            "rule": "jwt_token"
+          },
+          "detection": {
+            "file": "web/app.js",
+            "line": 2,
+            "rule": "jwt_token"
+          }
+        },
+        {
+          "truth": {
+            "file": "web/app.js",
+            "line": 3,
+            "rule": "discord_webhook"
+          },
+          "detection": {
+            "file": "web/app.js",
+            "line": 3,
+            "rule": "discord_webhook"
+          }
+        },
+        {
+          "truth": {
+            "file": "web/app.js",
+            "line": 4,
+            "rule": "mailchimp_api_key"
+          },
+          "detection": {
+            "file": "web/app.js",
+            "line": 4,
+            "rule": "mailchimp_api_key"
+          }
+        },
+        {
+          "truth": {
+            "file": "web/app.js",
+            "line": 6,
+            "rule": "private_key_header"
+          },
+          "detection": {
+            "file": "web/app.js",
+            "line": 6,
+            "rule": "private_key_header"
+          }
+        }
+      ],
+      "false_positives": [],
+      "missed": [
+        {
+          "file": "app/config.py",
+          "line": 4,
+          "rule": "aws_secret_access_key"
+        },
+        {
+          "file": "web/app.js",
+          "line": 5,
+          "rule": "telegram_bot_token"
+        }
+      ],
+      "duplicate_findings": [],
+      "stderr_tail": null
+    },
+    {
+      "name": "gitleaks",
+      "status": "not installed",
+      "available": false,
+      "version": null,
+      "command": "gitleaks detect --source <corpus> --no-git --report-format json --report-path <report.json> --exit-code 0",
+      "runtime_seconds": null,
+      "returncode": null,
+      "error": "`gitleaks` was not found on PATH",
+      "total_detections": 0,
+      "unique_detections": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "matched": [],
+      "false_positives": [],
+      "missed": [],
+      "duplicate_findings": [],
+      "stderr_tail": null
+    },
+    {
+      "name": "trufflehog",
+      "status": "not installed",
+      "available": false,
+      "version": null,
+      "command": "trufflehog filesystem <corpus> --json --no-update --no-verification",
+      "runtime_seconds": null,
+      "returncode": null,
+      "error": "`trufflehog` was not found on PATH",
+      "total_detections": 0,
+      "unique_detections": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "matched": [],
+      "false_positives": [],
+      "missed": [],
+      "duplicate_findings": [],
+      "stderr_tail": null
+    },
+    {
+      "name": "detect-secrets",
+      "status": "ok",
+      "available": true,
+      "version": "1.5.0",
+      "command": "detect-secrets.EXE scan <corpus> --all-files",
+      "runtime_seconds": 4.678,
+      "returncode": 0,
+      "error": null,
+      "total_detections": 17,
+      "unique_detections": 13,
+      "tp": 11,
+      "fp": 2,
+      "fn": 5,
+      "duplicates": 4,
+      "precision": 0.8462,
+      "recall": 0.6875,
+      "f1": 0.7586,
+      "matched": [
+        {
+          "truth": {
+            "file": ".env",
+            "line": 1,
+            "rule": "sendgrid_api_key"
+          },
+          "detection": {
+            "file": ".env",
+            "line": 1,
+            "rule": "SendGrid API Key"
+          }
+        },
+        {
+          "truth": {
+            "file": ".env",
+            "line": 2,
+            "rule": "gitlab_token"
+          },
+          "detection": {
+            "file": ".env",
+            "line": 2,
+            "rule": "GitLab Token"
+          }
+        },
+        {
+          "truth": {
+            "file": ".env",
+            "line": 4,
+            "rule": "twilio_api_key"
+          },
+          "detection": {
+            "file": ".env",
+            "line": 4,
+            "rule": "Twilio API Key"
+          }
+        },
+        {
+          "truth": {
+            "file": "app/config.py",
+            "line": 3,
+            "rule": "aws_access_key_id"
+          },
+          "detection": {
+            "file": "app/config.py",
+            "line": 3,
+            "rule": "AWS Access Key"
+          }
+        },
+        {
+          "truth": {
+            "file": "app/config.py",
+            "line": 4,
+            "rule": "aws_secret_access_key"
+          },
+          "detection": {
+            "file": "app/config.py",
+            "line": 4,
+            "rule": "Base64 High Entropy String"
+          }
+        },
+        {
+          "truth": {
+            "file": "app/config.py",
+            "line": 5,
+            "rule": "github_token"
+          },
+          "detection": {
+            "file": "app/config.py",
+            "line": 5,
+            "rule": "Base64 High Entropy String"
+          }
+        },
+        {
+          "truth": {
+            "file": "app/config.py",
+            "line": 6,
+            "rule": "openai_api_key"
+          },
+          "detection": {
+            "file": "app/config.py",
+            "line": 6,
+            "rule": "Base64 High Entropy String"
+          }
+        },
+        {
+          "truth": {
+            "file": "app/config.py",
+            "line": 8,
+            "rule": "database_uri_with_credentials"
+          },
+          "detection": {
+            "file": "app/config.py",
+            "line": 8,
+            "rule": "Basic Auth Credentials"
+          }
+        },
+        {
+          "truth": {
+            "file": "web/app.js",
+            "line": 1,
+            "rule": "google_api_key"
+          },
+          "detection": {
+            "file": "web/app.js",
+            "line": 1,
+            "rule": "Base64 High Entropy String"
+          }
+        },
+        {
+          "truth": {
+            "file": "web/app.js",
+            "line": 2,
+            "rule": "jwt_token"
+          },
+          "detection": {
+            "file": "web/app.js",
+            "line": 2,
+            "rule": "JSON Web Token"
+          }
+        },
+        {
+          "truth": {
+            "file": "web/app.js",
+            "line": 6,
+            "rule": "private_key_header"
+          },
+          "detection": {
+            "file": "web/app.js",
+            "line": 6,
+            "rule": "Private Key"
+          }
+        }
+      ],
+      "false_positives": [
+        {
+          "file": "clean/README.md",
+          "line": 6,
+          "rule": "AWS Access Key"
+        },
+        {
+          "file": "clean/clean.py",
+          "line": 8,
+          "rule": "AWS Access Key"
+        }
+      ],
+      "missed": [
+        {
+          "file": "app/config.py",
+          "line": 7,
+          "rule": "digitalocean_personal_access_token"
+        },
+        {
+          "file": "web/app.js",
+          "line": 3,
+          "rule": "discord_webhook"
+        },
+        {
+          "file": "web/app.js",
+          "line": 4,
+          "rule": "mailchimp_api_key"
+        },
+        {
+          "file": "web/app.js",
+          "line": 5,
+          "rule": "telegram_bot_token"
+        },
+        {
+          "file": ".env",
+          "line": 3,
+          "rule": "npm_token"
+        }
+      ],
+      "duplicate_findings": [],
+      "stderr_tail": null
+    },
+    {
+      "name": "secretlint",
+      "status": "not installed",
+      "available": false,
+      "version": null,
+      "command": "secretlint --format json <every-corpus-file>",
+      "runtime_seconds": null,
+      "returncode": null,
+      "error": "`secretlint` was not found on PATH",
+      "total_detections": 0,
+      "unique_detections": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "matched": [],
+      "false_positives": [],
+      "missed": [],
+      "duplicate_findings": [],
+      "stderr_tail": null
+    },
+    {
+      "name": "whispers",
+      "status": "not installed",
+      "available": false,
+      "version": null,
+      "command": "whispers <corpus>",
+      "runtime_seconds": null,
+      "returncode": null,
+      "error": "`whispers` was not found on PATH",
+      "total_detections": 0,
+      "unique_detections": 0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "duplicates": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "matched": [],
+      "false_positives": [],
+      "missed": [],
+      "duplicate_findings": [],
+      "stderr_tail": null
+    }
+  ]
+}

@@ -39,8 +39,13 @@ def _config_from_args(args) -> ScanConfig:
         git_history=args.git_history,
         git_history_depth=args.git_history_depth,
         git_since=args.git_since,
+        git_from=args.git_from,
+        git_to=args.git_to,
+        git_author=args.git_author,
         threads=args.threads,
         delay=args.delay,
+        per_host_delay=args.per_host_delay,
+        per_host_concurrency=args.per_host_concurrency,
         proxy=args.proxy,
         proxy_auth=args.proxy_auth,
         timeout=args.timeout,
@@ -56,12 +61,15 @@ def _config_from_args(args) -> ScanConfig:
         exclude_patterns=args.exclude,
         allow_external=args.allow_external,
         respect_robots=args.respect_robots,
+        source_maps=args.source_maps,
         method=args.method,
         post_data=args.data,
         max_response_size=args.max_size,
         confidence_threshold=args.confidence,
         entropy_threshold=args.entropy,
         custom_pattern_files=args.custom_patterns,
+        gitleaks_configs=args.gitleaks_config,
+        semgrep_configs=args.semgrep_config,
         include_noise=args.include_noise,
         include_pii=args.include_pii,
         include_endpoints=args.include_endpoints,
@@ -74,6 +82,7 @@ def _config_from_args(args) -> ScanConfig:
         exclude_types=args.exclude_type,
         max_per_rule=args.max_per_rule,
         ignore_files=args.ignore_file,
+        use_default_ignore=not args.no_default_ignore,
         show_context=args.show_context,
         validate_workers=args.validate_workers,
         validate_max=args.validate_max,
@@ -84,6 +93,10 @@ def _config_from_args(args) -> ScanConfig:
         redact_output=args.redact,
         write_ignore=args.write_ignore,
         allowlist_values=args.allowlist_values,
+        serve=args.serve,
+        serve_host=args.serve_host,
+        serve_port=args.serve_port,
+        open_browser=args.open_browser,
         webhook_url=args.webhook,
         webhook_format=args.webhook_format,
         webhook_min_severity=args.webhook_min_severity,
@@ -95,6 +108,7 @@ def _config_from_args(args) -> ScanConfig:
         safe_mode=args.safe_mode,
         fail_on=args.fail_on,
         plugin_dir=args.plugin_dir,
+        entrypoint_plugins=args.entrypoint_plugins,
     )
 
 
@@ -141,6 +155,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     findings = run_scan(cfg)
     if not cfg.quiet:
         print_summary(findings)
+
+    if cfg.serve:
+        from .server import serve_report
+
+        serve_report(
+            cfg.output_dir,
+            host=cfg.serve_host,
+            port=cfg.serve_port,
+            open_browser=cfg.open_browser,
+        )
 
     return compute_exit_code(findings, cfg.fail_on)
 

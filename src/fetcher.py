@@ -14,6 +14,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from .config import ScanConfig
+from .ratelimit import HostRateLimiter
 
 logger = logging.getLogger("secref.fetcher")
 
@@ -156,12 +157,14 @@ def fetch_url(
     url: str,
     session: Optional[requests.Session] = None,
     method: Optional[str] = None,
+    limiter: Optional[HostRateLimiter] = None,
 ) -> Tuple[Optional[str], Optional[str], Optional[requests.Response]]:
     """Fetch a URL with proxy, auth, retry, jitter, and size limits.
 
     Returns ``(body_text, final_url, response)`` or ``(None, None, None)``.
     ``method`` overrides ``cfg.method`` (used by the crawler so discovery is
-    always a GET).
+    always a GET).  ``limiter`` applies per-host delay/concurrency and receives
+    adaptive backoff hints from 429 responses.
     """
     if session is None:
         session = _build_session(cfg)
@@ -175,14 +178,25 @@ def fetch_url(
     attempts = max(1, min(cfg.max_retries, 5))
     for attempt in range(attempts):
         try:
-            resp = session.request(
-                method=request_method,
-                url=url,
-                timeout=cfg.timeout,
-                allow_redirects=True,
-                data=data,
-                stream=True,
-            )
+            if limiter is not None:
+                with limiter.limit(url):
+                    resp = session.request(
+                        method=request_method,
+                        url=url,
+                        timeout=cfg.timeout,
+                        allow_redirects=True,
+                        data=data,
+                        stream=True,
+                    )
+            else:
+                resp = session.request(
+                    method=request_method,
+                    url=url,
+                    timeout=cfg.timeout,
+                    allow_redirects=True,
+                    data=data,
+                    stream=True,
+                )
         except requests.exceptions.Timeout:
             logger.warning(f"Timeout fetching {url}")
             return None, None, None
@@ -204,12 +218,15 @@ def fetch_url(
                 except (TypeError, ValueError):
                     retry_after = cfg.delay * (2 ** attempt)
                 retry_after = max(0.5, min(retry_after, 60.0))
+                if limiter is not None:
+                    limiter.penalize(url, retry_after)
                 if attempt + 1 < attempts:
                     logger.warning(
                         f"Rate limited on {url}, retrying in {retry_after:.1f}s "
                         f"({attempt + 1}/{attempts})"
                     )
-                    time.sleep(retry_after)
+                    if limiter is None:
+                        time.sleep(retry_after)
                     continue
                 logger.warning(f"Rate limited on {url}, giving up")
                 return None, None, None

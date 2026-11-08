@@ -22,6 +22,37 @@ def test_parse_url_mode():
     assert args.fail_on == "high"
 
 
+def test_parse_new_advanced_flags():
+    args = parse_args([
+        "--path", ".",
+        "--git-history",
+        "--git-from", "v8.0.0",
+        "--git-to", "HEAD",
+        "--git-author", "Alice",
+        "--per-host-delay", "1.5",
+        "--per-host-concurrency", "2",
+        "--source-maps",
+        "--gitleaks-config", "gitleaks.toml",
+        "--serve",
+        "--serve-port", "9000",
+        "--entrypoint-plugins",
+    ])
+    assert args.git_from == "v8.0.0"
+    assert args.git_to == "HEAD"
+    assert args.git_author == "Alice"
+    assert args.per_host_delay == 1.5
+    assert args.per_host_concurrency == 2
+    assert args.source_maps
+    assert args.gitleaks_config == ["gitleaks.toml"]
+    assert args.serve and args.serve_port == 9000
+    assert args.entrypoint_plugins
+
+
+def test_git_filters_require_history():
+    with pytest.raises(SystemExit):
+        parse_args(["--path", ".", "--git-from", "v8.0.0"])
+
+
 def test_url_and_path_conflict():
     with pytest.raises(SystemExit):
         parse_args(["https://example.com", "--path", "src"])

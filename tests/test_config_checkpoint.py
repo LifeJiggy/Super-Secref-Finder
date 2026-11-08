@@ -28,6 +28,21 @@ def test_config_conflict_is_reported():
     assert any("choose one target" in problem for problem in cfg.validate())
 
 
+def test_config_new_network_and_serve_fields():
+    cfg = ScanConfig(
+        url="https://x.test",
+        per_host_delay=999,
+        per_host_concurrency=500,
+        serve=True,
+        serve_port=70000,
+        output_format=["json"],
+    ).normalize()
+    assert cfg.per_host_delay == 300
+    assert cfg.per_host_concurrency == 100
+    assert cfg.serve_port == 65535
+    assert "html" in cfg.output_format
+
+
 def test_checkpoint_roundtrip(tmp_path):
     path = tmp_path / "state.json"
     findings = [{"type": "aws_access_key_id", "value": "AKIA1234567890ABCDEF", "context": "secret context"}]

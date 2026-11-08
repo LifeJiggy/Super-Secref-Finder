@@ -4,6 +4,80 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [8.3.0] - 2026-11-08
+
+This release adds interoperability with rules and suppression comments from
+Semgrep, gitleaks, secretlint, detect-secrets, and Bandit.
+
+### Added
+
+- **Semgrep-compatible YAML import**: `--semgrep-config PATH` imports the safe
+  regex subset of Semgrep rules: `pattern-regex`, `pattern-either`,
+  `pattern-not-regex`, `paths.include`/`paths.exclude`, `metadata.category`,
+  `metadata.tags`, `metadata.entropy`, severity mapping, and `fix`.
+  AST-only predicates are skipped with a warning.
+- **Path-scoped rules**: custom rules and Semgrep imports can restrict matches
+  to include globs and exclude vendored, test, or generated paths.
+- **Negative patterns**: `pattern_not` / `pattern-not-regex` suppresses
+  placeholder and example matches without a separate allowlist.
+- **Cross-tool inline suppression**: `secref:ignore`,
+  `secref:disable-line`, `secref:disable-next-line`, `gitleaks:allow`,
+  `trufflehog:ignore`, `secretlint-disable-line`,
+  `secretlint-disable-next-line`, `pragma: allowlist secret`, and `nosec`.
+- **Fix suggestions**: imported Semgrep `fix` text is attached to findings in
+  JSON output.
+- **Benchmark results**: reproducible harness and published comparison against
+  five open-source scanners under `benchmarks/`.
+
+### Changed
+
+- Version bumped to `8.3.0`.
+- The test suite grew from 112 to 119 tests.
+- README, CHANGELOG, CURRENT_STATE, and architecture documentation describe the
+  new compatibility layer.
+
+## [8.2.0] - 2026-11-07
+
+This release closes the remaining P2 roadmap and adds reproducible benchmark
+tooling.
+
+### Added
+
+- **Source-map and chunk discovery**: `--source-maps` follows
+  `sourceMappingURL` comments and quoted webpack/Vite/Rollup chunk paths,
+  including JavaScript discovered at the crawl-depth boundary.
+- **Gitleaks TOML import**: `--gitleaks-config PATH` converts `[[rules]]` packs
+  (id, description, regex, secretGroup, entropy, tags) into native rules.
+  `tomli` is installed automatically on Python < 3.11.
+- **Local report dashboard**: `--serve`, `--serve-host`, `--serve-port`, and
+  `--open-browser` start a read-only server over the output directory, with a
+  report index and traversal protection.
+- **Per-host scheduling**: `--per-host-delay` and `--per-host-concurrency`
+  bound each host independently. 429 responses call an adaptive `penalize`
+  path so one throttled host does not stall unrelated workers.
+- **Rotation guidance**: provider credential findings now include
+  `rotation_url` in JSON, CSV, Markdown, HTML, SARIF, and JUnit output.
+  `src/rotation.py` maps 50+ providers and generic credential rules.
+- **More live validators**: Cloudflare, Groq, OpenRouter, Replicate, and Cohere
+  tokens use read-only, allow-listed checks. All are mocked in tests.
+- **Git history filters**: `--git-from`, `--git-to`, and `--git-author` select a
+  commit range or author without abandoning the existing `--git-since` and
+  depth controls.
+- **Plugin marketplace convention**: `--entrypoint-plugins` loads packages from
+  the `secref.plugins` entry-point group; `PLUGINS.md` documents the API,
+  packaging convention, and contribution checklist.
+- **Benchmark harness**: `benchmarks/` contains a synthetic corpus and adapters
+  for five open-source scanners.
+
+### Changed
+
+- Version bumped to `8.2.0`.
+- The test suite grew from 91 to 112 tests.
+- The report HTML/Markdown tables include a rotation link and dashboard server
+  support.
+- README, CURRENT_STATE, and architecture documentation reflect the completed
+  roadmap.
+
 ## [8.1.0] - 2026-11-07
 
 This release turns the scanner into a live repository and pre-commit security
@@ -137,6 +211,8 @@ scanning, and makes the tool usable as a CI gate.
 - Multi-threaded website and JavaScript scanning.
 - Initial regex pattern collection, entropy checks, and interactive menu.
 
+[8.3.0]: https://github.com/LifeJiggy/Super-Secref-Finder/compare/v8.2.0...v8.3.0
+[8.2.0]: https://github.com/LifeJiggy/Super-Secref-Finder/compare/v8.1.0...v8.2.0
 [8.1.0]: https://github.com/LifeJiggy/Super-Secref-Finder/compare/v8.0.0...v8.1.0
 [8.0.0]: https://github.com/LifeJiggy/Super-Secref-Finder/compare/v7.0.0...v8.0.0
 [7.0.0]: https://github.com/LifeJiggy/Super-Secref-Finder/releases/tag/v7.0.0

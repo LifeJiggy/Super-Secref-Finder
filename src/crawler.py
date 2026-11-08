@@ -16,6 +16,7 @@ from urllib.robotparser import RobotFileParser
 
 from .config import ScanConfig
 from .rules import Rule, all_rule_ids
+from .sourcemaps import extract_bundler_chunks, extract_source_map_urls
 from .validators import confidence_for, validate_rule
 
 logger = logging.getLogger("secref.crawler")
@@ -198,6 +199,30 @@ def _fetch_page(fetch_fn, url: str, method: Optional[str] = None):
     return result, url
 
 
+def _enqueue_assets(
+    queue: deque,
+    visited: Set[str],
+    cfg: ScanConfig,
+    allowed_hosts: Set[str],
+    text: str,
+    base_url: str,
+    depth: int,
+    result: CrawlResult,
+) -> None:
+    """Queue source maps and JS chunks referenced by one document."""
+    candidates = extract_source_map_urls(text, base_url)
+    candidates.extend(extract_bundler_chunks(text, base_url))
+    for candidate in candidates:
+        if candidate in visited:
+            continue
+        if not _link_allowed(candidate, cfg, allowed_hosts):
+            continue
+        if len(result.targets) + len(queue) >= cfg.max_urls:
+            break
+        visited.add(candidate)
+        queue.append((candidate, depth + 1))
+
+
 def build_target_list(cfg: ScanConfig, fetch_fn) -> CrawlResult:
     """Build the full URL target list, caching any pages fetched for discovery.
 
@@ -248,11 +273,23 @@ def build_target_list(cfg: ScanConfig, fetch_fn) -> CrawlResult:
 
         result.targets.append(url)
 
-        # Direct JS files are leaves: never fetch during discovery.
+        # Direct JS files are leaves: never fetch during discovery.  When
+        # source-map discovery is enabled we do fetch them once so their
+        # sourceMappingURL/chunk references can enter the queue.
         if url in direct_js:
+            if cfg.source_maps:
+                text, final_url = _fetch_page(fetch_fn, url, "GET")
+                if text:
+                    result.prefetched[url] = (text, final_url or url)
+                    _enqueue_assets(
+                        queue, visited, cfg, allowed_hosts, text,
+                        final_url or url, depth, result,
+                    )
             continue
         if depth >= cfg.depth:
-            continue
+            asset = urlparse(url).path.lower().endswith((".js", ".mjs", ".cjs", ".css"))
+            if not (cfg.source_maps and asset and depth == cfg.depth):
+                continue
 
         text, final_url = _fetch_page(fetch_fn, url, "GET")
         if not text:
@@ -261,6 +298,12 @@ def build_target_list(cfg: ScanConfig, fetch_fn) -> CrawlResult:
         result.prefetched[url] = (text, effective_url)
         if effective_url != url:
             result.prefetched[effective_url] = (text, effective_url)
+
+        if cfg.source_maps:
+            _enqueue_assets(
+                queue, visited, cfg, allowed_hosts, text,
+                effective_url, depth, result,
+            )
 
         # JavaScript is always worth adding, even if it is beyond depth.
         for js_url in extract_js_links(text, effective_url):

@@ -23,6 +23,8 @@ from .rules import (
     compile_rules,
     all_rule_ids,
 )
+from .gitleaks import load_gitleaks_rules
+from .semgrep import load_semgrep_rules
 
 # Backward-compatible views -------------------------------------------------
 SENSITIVE_PATTERNS: Dict[str, str] = builtin_patterns(include_noise=False, include_pii=False)
@@ -34,8 +36,20 @@ PII_PATTERNS: Dict[str, str] = {
 }
 
 
+def _as_tuple(value) -> tuple:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return (value,)
+    return tuple(str(item) for item in value)
+
+
 def _coerce_rule(name: str, info) -> Optional[Rule]:
     """Build a Rule from a custom-pattern YAML/JSON entry."""
+    path_include = ()
+    path_exclude = ()
+    negative_pattern = None
+    fix = None
     if isinstance(info, dict):
         regex = info.get("regex") or info.get("pattern") or ""
         description = info.get("description", "")
@@ -45,6 +59,11 @@ def _coerce_rule(name: str, info) -> Optional[Rule]:
         entropy = float(info.get("entropy", info.get("entropy_min", 0.0)) or 0.0)
         noise = bool(info.get("noise", False))
         pii = bool(info.get("pii", False))
+        paths = info.get("paths") if isinstance(info.get("paths"), dict) else {}
+        path_include = _as_tuple(info.get("path_include") or paths.get("include"))
+        path_exclude = _as_tuple(info.get("path_exclude") or paths.get("exclude"))
+        negative_pattern = info.get("negative_pattern") or info.get("pattern_not")
+        fix = info.get("fix") if isinstance(info.get("fix"), str) else None
     else:
         regex = str(info)
         description = ""
@@ -81,6 +100,10 @@ def _coerce_rule(name: str, info) -> Optional[Rule]:
         noise=noise,
         pii=pii,
         tags=("custom",),
+        path_include=path_include,
+        path_exclude=path_exclude,
+        negative_pattern=str(negative_pattern) if negative_pattern else None,
+        fix=fix,
     )
 
 
@@ -119,6 +142,8 @@ def get_rules(
     exclude_types: Optional[Iterable[str]] = None,
     min_severity: Optional[str] = None,
     include_endpoints: bool = False,
+    gitleaks_files: Optional[List[str]] = None,
+    semgrep_files: Optional[List[str]] = None,
 ) -> List[Rule]:
     """Return the compiled rule set for a scan.
 
@@ -130,6 +155,8 @@ def get_rules(
         exclude_types: drop these rule IDs.
         min_severity: minimum severity name.
         include_endpoints: include endpoint-discovery rules (off by default).
+        gitleaks_files: gitleaks TOML configs to import.
+        semgrep_files: Semgrep-compatible YAML configs to import (regex subset).
     """
     rules: List[Rule] = []
     explicit = set(include_types or [])
@@ -148,6 +175,10 @@ def get_rules(
 
     for path in custom_files or []:
         rules.extend(load_custom_rules(path))
+    for path in gitleaks_files or []:
+        rules.extend(load_gitleaks_rules(path))
+    for path in semgrep_files or []:
+        rules.extend(load_semgrep_rules(path))
 
     include_set = set(include_types) if include_types else None
     exclude_set = set(exclude_types) if exclude_types else set()

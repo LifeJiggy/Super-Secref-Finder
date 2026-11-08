@@ -8,7 +8,7 @@ from src._compat import scan_text as compat_scan_text
 
 
 def test_package_public_api():
-    assert src.__version__ == "8.1.0"
+    assert src.__version__ == "8.3.0"
     assert ScanConfig is not None
     assert get_rules() is not None
     assert callable(scan_text)

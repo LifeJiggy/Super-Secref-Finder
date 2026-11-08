@@ -119,35 +119,61 @@ def load_ignore_file(path: str) -> Allowlist:
     return allow
 
 
-def load_allowlist(paths: Optional[Iterable[str]] = None, project_dir: str = ".") -> Allowlist:
+def load_allowlist(
+    paths: Optional[Iterable[str]] = None,
+    project_dir: str = ".",
+    include_default: bool = True,
+) -> Allowlist:
     """Load one or more ignore files, plus ``.secrefignore`` if present."""
     allow = Allowlist()
     candidates: List[str] = []
     if paths:
         candidates.extend(paths)
     default_path = os.path.join(project_dir, ".secrefignore")
-    if os.path.isfile(default_path) and default_path not in candidates:
+    if include_default and os.path.isfile(default_path) and default_path not in candidates:
         candidates.append(default_path)
     for path in candidates:
         allow.merge(load_ignore_file(path))
     return allow
 
 
-_INLINE_IGNORE_RE = re.compile(r"secref\s*:\s*ignore", re.IGNORECASE)
+# Suppression markers on the same line as the finding. The list mirrors the
+# most common conventions so teams can migrate from gitleaks, secretlint, and
+# detect-secrets without rewriting their source comments.
+_INLINE_IGNORE_RES = (
+    re.compile(r"secref\s*:\s*ignore(?!-)", re.IGNORECASE),
+    re.compile(r"secref\s*:\s*disable-line", re.IGNORECASE),
+    re.compile(r"gitleaks\s*:\s*allow", re.IGNORECASE),
+    re.compile(r"trufflehog\s*:\s*ignore", re.IGNORECASE),
+    re.compile(r"secretlint-disable-line", re.IGNORECASE),
+    re.compile(r"pragma\s*:\s*allowlist\s+secret", re.IGNORECASE),
+    re.compile(r"\bnosec\b", re.IGNORECASE),
+)
+
+# Markers that suppress the *following* line.
+_NEXT_LINE_IGNORE_RES = (
+    re.compile(r"secref\s*:\s*disable-next-line", re.IGNORECASE),
+    re.compile(r"secretlint-disable-next-line", re.IGNORECASE),
+)
 
 
 def has_inline_ignore(text: str, start: int) -> bool:
-    """Return True if ``secref:ignore`` appears on the match line or line above."""
+    """Return True when an inline suppression covers the match position.
+
+    Supports ``secref:ignore`` and common markers from gitleaks, secretlint,
+    trufflehog, detect-secrets (``pragma: allowlist secret``), and Bandit
+    (``nosec``). ``*-next-line`` markers must be on the preceding line.
+    """
     line_start = text.rfind("\n", 0, start) + 1
     line_end = text.find("\n", start)
     if line_end == -1:
         line_end = len(text)
     current_line = text[line_start:line_end]
-    if _INLINE_IGNORE_RE.search(current_line):
+    if any(pattern.search(current_line) for pattern in _INLINE_IGNORE_RES):
         return True
     previous_start = text.rfind("\n", 0, max(0, line_start - 1)) + 1
     previous_line = text[previous_start:max(0, line_start - 1)]
-    return bool(_INLINE_IGNORE_RE.search(previous_line))
+    return any(pattern.search(previous_line) for pattern in _NEXT_LINE_IGNORE_RES)
 
 
 def _safe_url(url: str) -> str:

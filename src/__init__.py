@@ -9,7 +9,7 @@ Heavy modules are imported lazily so ``import src`` stays cheap.
 
 from __future__ import annotations
 
-__version__ = "8.1.0"
+__version__ = "8.3.0"
 __author__ = "ArkhAngelLifeJiggy"
 
 __all__ = [

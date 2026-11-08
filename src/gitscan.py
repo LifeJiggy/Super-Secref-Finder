@@ -97,24 +97,40 @@ def iter_history_documents(
     path: str = ".",
     max_commits: int = 100,
     since: Optional[str] = None,
+    from_ref: Optional[str] = None,
+    to_ref: Optional[str] = None,
+    author: Optional[str] = None,
 ) -> Iterable[Dict]:
     """Yield ``{text, path, url, commit, author, ...}`` for added lines in history.
 
     Each document contains only added lines from one file in one commit. This
     keeps history scans focused on what was introduced, not on the whole file
     once per commit.
+
+    ``from_ref``/``to_ref`` select a commit range (e.g. ``v8.0.0..HEAD``) and
+    ``author`` is passed through to ``git log --author``.  When no range is
+    supplied the historical ``--all`` behavior is preserved.
     """
     root = repo_root(path)
     repo_name = os.path.basename(root.rstrip("/\\")) or "repo"
     args = [
         "log",
-        "--all",
         "-p",
         "-U0",
         "--no-color",
         "--no-ext-diff",
         f"--pretty=format:{_RECORD}%H{_FIELD}%an{_FIELD}%ae{_FIELD}%aI{_FIELD}%s",
     ]
+    if from_ref and to_ref:
+        args.append(f"{from_ref}..{to_ref}")
+    elif from_ref:
+        args.append(f"{from_ref}..HEAD")
+    elif to_ref:
+        args.append(to_ref)
+    else:
+        args.append("--all")
+    if author:
+        args.append(f"--author={author}")
     if max_commits and max_commits > 0:
         args.extend(["-n", str(max_commits)])
     if since:

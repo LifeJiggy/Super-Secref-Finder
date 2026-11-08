@@ -86,3 +86,37 @@ def test_history_documents_only_added_lines(tmp_path):
     assert SECRET in added
     assert all(doc["commit"] for doc in documents)
     assert any(doc["commit_message"] == "add secret" for doc in documents)
+
+
+def test_history_author_and_range_filters(tmp_path):
+    repo = _repo(tmp_path)
+    (repo / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "initial")
+
+    _git(repo, "config", "user.name", "Alice")
+    _git(repo, "config", "user.email", "alice@example.com")
+    (repo / "app.py").write_text(f"KEY={SECRET}\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "alice secret")
+
+    log = subprocess.check_output(
+        ["git", "log", "--format=%H%x20%s"], cwd=repo, text=True
+    ).splitlines()
+    subjects = {line.split(" ", 1)[1]: line.split(" ", 1)[0] for line in log}
+    initial = subjects["initial"]
+    secret_commit = subjects["alice secret"]
+
+    alice_docs = list(iter_history_documents(str(repo), author="Alice"))
+    assert alice_docs
+    assert all(doc["author"] == "Alice" for doc in alice_docs)
+    assert any(SECRET in doc["text"] for doc in alice_docs)
+
+    ranged = list(iter_history_documents(
+        str(repo), from_ref=initial, to_ref=secret_commit
+    ))
+    assert ranged
+    assert {doc["commit"] for doc in ranged} == {secret_commit}
+
+    head_only = list(iter_history_documents(str(repo), to_ref=initial))
+    assert {doc["commit"] for doc in head_only} == {initial}

@@ -87,6 +87,28 @@ def test_inline_ignore():
     assert scan_text(text, "https://t.test/", RULES, CFG) == []
 
 
+def test_inline_suppression_compatibility():
+    token = f'ghp_{"d" * 36}'
+    for marker in (
+        "secref:ignore",
+        "secref:disable-line",
+        "gitleaks:allow",
+        "trufflehog:ignore",
+        "secretlint-disable-line",
+        "pragma: allowlist secret",
+        "nosec",
+    ):
+        text = f'token = "{token}"  # {marker}'
+        assert scan_text(text, "https://t.test/", RULES, CFG) == [], marker
+
+
+def test_inline_next_line_suppression():
+    token = f'ghp_{"d" * 36}'
+    for marker in ("secref:disable-next-line", "secretlint-disable-next-line"):
+        text = f"# {marker}\ntoken = \"{token}\""
+        assert scan_text(text, "https://t.test/", RULES, CFG) == [], marker
+
+
 def test_per_rule_cap():
     keys = "\n".join(
         f"K{i}=AKIA{str(i) * 4}{'ABCDEFGHIJKL'}"
@@ -105,6 +127,22 @@ def test_dedupe_keeps_highest_severity():
     deduped = dedupe_findings(findings)
     assert len(deduped) == 1
     assert deduped[0]["type"] == "github_token"
+
+
+def test_dedupe_prefers_specific_rule_at_same_severity():
+    findings = [
+        {
+            "type": "generic_secret_assignment", "value": "abc", "url": "u",
+            "severity": "high", "confidence": 0.99,
+        },
+        {
+            "type": "semgrep_internal_token", "value": "abc", "url": "u",
+            "severity": "high", "confidence": 0.8,
+        },
+    ]
+    deduped = dedupe_findings(findings)
+    assert len(deduped) == 1
+    assert deduped[0]["type"] == "semgrep_internal_token"
 
 
 def test_exit_codes():

@@ -96,12 +96,22 @@ Examples:
     parser.add_argument("--git-history-depth", type=int, default=100,
                         help="Max commits for --git-history (default: 100; 0 = all)")
     parser.add_argument("--git-since", help="Only history after this date (git --since)")
+    parser.add_argument("--git-from", metavar="REV",
+                        help="Start of history range (exclusive), e.g. v8.0.0")
+    parser.add_argument("--git-to", metavar="REV",
+                        help="End of history range (inclusive, default HEAD)")
+    parser.add_argument("--git-author", metavar="PATTERN",
+                        help="Only commits whose author matches this git pattern")
 
     # Threading ------------------------------------------------------------
     parser.add_argument("-t", "--threads", type=int, default=10,
                         help="Worker threads, 1-100 (default: 10)")
     parser.add_argument("-d", "--delay", type=float, default=1.0,
                         help="Delay between web requests in seconds (default: 1.0)")
+    parser.add_argument("--per-host-delay", type=float, default=0.0,
+                        help="Minimum seconds between request starts per host (default: 0)")
+    parser.add_argument("--per-host-concurrency", type=int, default=0,
+                        help="Max concurrent requests per host, 0 = unlimited (default: 0)")
 
     # Network --------------------------------------------------------------
     parser.add_argument("--proxy", help="Proxy URL (e.g. http://127.0.0.1:8080)")
@@ -135,6 +145,8 @@ Examples:
                         help="Follow links to other hosts (off by default)")
     parser.add_argument("--respect-robots", action="store_true",
                         help="Respect robots.txt during crawling")
+    parser.add_argument("--source-maps", action="store_true",
+                        help="Discover sourceMappingURL maps and quoted JS chunks")
 
     # HTTP -----------------------------------------------------------------
     parser.add_argument("--method", choices=["GET", "POST"], default="GET",
@@ -150,6 +162,10 @@ Examples:
                         help="Global entropy floor for secret rules; 0 = rule defaults")
     parser.add_argument("--custom-patterns", nargs="*", default=[],
                         help="Custom rule files (YAML/JSON)")
+    parser.add_argument("--gitleaks-config", action="append", default=[], metavar="PATH",
+                        help="Import rules from a gitleaks TOML config (repeatable)")
+    parser.add_argument("--semgrep-config", action="append", default=[], metavar="PATH",
+                        help="Import the regex subset of a Semgrep YAML config (repeatable)")
     parser.add_argument("--include-noise", action="store_true",
                         help="Also report code smells (eval, console.log, inline scripts, ...)")
     parser.add_argument("--include-pii", action="store_true",
@@ -174,6 +190,8 @@ Examples:
                         help="Max findings per rule per document (default: 5)")
     parser.add_argument("--ignore-file", action="append", default=[],
                         help="Allowlist file (repeatable); default .secrefignore")
+    parser.add_argument("--no-default-ignore", action="store_true",
+                        help="Do not load .secrefignore from the current directory")
     parser.add_argument("--show-context", action="store_true",
                         help="Include an evidence snippet in reports")
     parser.add_argument("--list-rules", action="store_true",
@@ -199,6 +217,14 @@ Examples:
                         help="Write a precise allowlist from findings (hashed fingerprints)")
     parser.add_argument("--allowlist-values", action="store_true",
                         help="Also write raw value regexes to --write-ignore (sensitive)")
+    parser.add_argument("--serve", action="store_true",
+                        help="Serve a local report dashboard after the scan (forces HTML)")
+    parser.add_argument("--serve-host", default="127.0.0.1",
+                        help="Dashboard bind address (default: 127.0.0.1)")
+    parser.add_argument("--serve-port", type=int, default=8000,
+                        help="Dashboard port (default: 8000)")
+    parser.add_argument("--open-browser", action="store_true",
+                        help="Open the report dashboard in the default browser")
 
     # CI -------------------------------------------------------------------
     parser.add_argument(
@@ -217,6 +243,8 @@ Examples:
 
     # Plugins --------------------------------------------------------------
     parser.add_argument("--plugin-dir", help="Directory containing plugin .py files")
+    parser.add_argument("--entrypoint-plugins", action="store_true",
+                        help="Load installed plugins from the 'secref.plugins' entry-point group")
 
     # Notifications --------------------------------------------------------
     parser.add_argument("--webhook", metavar="URL",
@@ -268,11 +296,19 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         parser.error("--github-ref requires --github")
     if args.staged and args.changed:
         parser.error("use either --staged or --changed, not both")
+    if (args.git_from or args.git_to or args.git_author) and not args.git_history:
+        parser.error("--git-from, --git-to, and --git-author require --git-history")
 
     if not 1 <= args.threads <= 100:
         parser.error("--threads must be between 1 and 100")
     if args.delay < 0 or args.delay > 100:
         parser.error("--delay must be between 0 and 100 seconds")
+    if args.per_host_delay < 0 or args.per_host_delay > 300:
+        parser.error("--per-host-delay must be between 0 and 300 seconds")
+    if not 0 <= args.per_host_concurrency <= 100:
+        parser.error("--per-host-concurrency must be between 0 and 100")
+    if not 1 <= args.serve_port <= 65535:
+        parser.error("--serve-port must be between 1 and 65535")
     if not 0 <= args.confidence <= 1:
         parser.error("--confidence must be between 0 and 1")
     if args.max_per_rule < 1:

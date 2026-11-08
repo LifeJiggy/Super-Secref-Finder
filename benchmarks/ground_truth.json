@@ -1,0 +1,24 @@
+{
+  "description": "Synthetic, non-live credentials for scanner comparison. Values are base64-encoded in secrets.b64.json and materialized at benchmark time; never replace them with real credentials.",
+  "secrets": [
+    {"file": "app/config.py", "line": 3, "rule": "aws_access_key_id", "token": "AWS_ACCESS_KEY_ID"},
+    {"file": "app/config.py", "line": 4, "rule": "aws_secret_access_key", "token": "AWS_SECRET_ACCESS_KEY"},
+    {"file": "app/config.py", "line": 5, "rule": "github_token", "token": "GITHUB_TOKEN"},
+    {"file": "app/config.py", "line": 6, "rule": "openai_api_key", "token": "OPENAI_API_KEY"},
+    {"file": "app/config.py", "line": 7, "rule": "digitalocean_personal_access_token", "token": "DIGITALOCEAN_TOKEN"},
+    {"file": "app/config.py", "line": 8, "rule": "database_uri_with_credentials", "token": "DATABASE_URL"},
+
+    {"file": "web/app.js", "line": 1, "rule": "google_api_key", "token": "GOOGLE_API_KEY"},
+    {"file": "web/app.js", "line": 2, "rule": "jwt_token", "token": "JWT_TOKEN"},
+    {"file": "web/app.js", "line": 3, "rule": "discord_webhook", "token": "DISCORD_WEBHOOK"},
+    {"file": "web/app.js", "line": 4, "rule": "mailchimp_api_key", "token": "MAILCHIMP_API_KEY"},
+    {"file": "web/app.js", "line": 5, "rule": "telegram_bot_token", "token": "TELEGRAM_BOT_TOKEN"},
+    {"file": "web/app.js", "line": 6, "rule": "private_key_header", "token": "PRIVATE_KEY_HEADER"},
+
+    {"file": ".env", "line": 1, "rule": "sendgrid_api_key", "token": "SENDGRID_API_KEY"},
+    {"file": ".env", "line": 2, "rule": "gitlab_token", "token": "GITLAB_TOKEN"},
+    {"file": ".env", "line": 3, "rule": "npm_token", "token": "NPM_TOKEN"},
+    {"file": ".env", "line": 4, "rule": "twilio_api_key", "token": "TWILIO_API_KEY"}
+  ],
+  "clean_files": ["clean/clean.py", "clean/README.md"]
+}

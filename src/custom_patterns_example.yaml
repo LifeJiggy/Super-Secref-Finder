@@ -14,8 +14,12 @@
 #   entropy     minimum Shannon entropy for the captured value (default: 0)
 #   noise       true = only run with --include-noise (default: false)
 #   pii         true = only run with --include-pii (default: false)
+#   paths       include/exclude globs, relative to the repository root
+#   pattern_not regex that suppresses a match (placeholder/example filter)
+#   fix         optional remediation text included in JSON findings
 #
-# Tip: add `# secref:ignore` on a line to suppress a single match.
+# Tip: add `# secref:ignore` (or gitleaks/secretlint/Bandit equivalents) on a
+# line to suppress a single match.
 
 patterns:
   internal_api_key:
@@ -38,6 +42,10 @@ patterns:
     severity: critical
     category: credential
     group: 1
+    paths:
+      include: ["src/**", "services/**"]
+      exclude: ["tests/**", "vendor/**"]
+    pattern_not: "example|placeholder|localhost"
 
   # Simple string form is still supported (defaults to medium/custom).
   legacy_simple_pattern: "LEGACY-[0-9]{8}"

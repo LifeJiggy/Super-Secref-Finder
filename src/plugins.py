@@ -72,6 +72,49 @@ def discover_plugins(plugin_dir: str) -> List[str]:
     return loaded
 
 
+def discover_entrypoint_plugins(group: str = "secref.plugins") -> List[str]:
+    """Load installed plugins declared through Python entry points.
+
+    A plugin package can publish::
+
+        [project.entry-points."secref.plugins"]
+        example = "my_secref_plugin"
+
+    Importing the module is enough if it uses ``register_plugin``.  If the
+    entry point resolves to a callable, it is invoked once so it can register
+    itself.
+    """
+    loaded: List[str] = []
+    try:
+        from importlib.metadata import entry_points
+    except ImportError:  # pragma: no cover - Python 3.8+ always has it
+        return loaded
+
+    try:
+        eps = entry_points(group=group)
+    except TypeError:  # pragma: no cover - Python 3.8/3.9 compatibility
+        eps = entry_points().get(group, [])  # type: ignore[arg-type]
+    except Exception as exc:  # pragma: no cover - metadata variability
+        logger.warning(f"Could not read plugin entry points: {exc}")
+        return loaded
+
+    for entry_point in eps:
+        try:
+            obj = entry_point.load()
+            if callable(obj) and not isinstance(obj, type):
+                try:
+                    obj()
+                except TypeError:
+                    # It may be a scan plugin that expects arguments; importing
+                    # the module already registered it.
+                    pass
+            loaded.append(entry_point.name)
+            logger.info(f"Loaded entry-point plugin: {entry_point.name}")
+        except Exception as exc:  # pragma: no cover - user code
+            logger.warning(f"Failed to load entry-point plugin {entry_point.name}: {exc}")
+    return loaded
+
+
 def run_plugins(
     url: str,
     text: str,

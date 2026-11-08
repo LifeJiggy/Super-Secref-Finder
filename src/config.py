@@ -25,10 +25,15 @@ class ScanConfig:
     git_history: bool = False
     git_history_depth: int = 100
     git_since: Optional[str] = None
+    git_from: Optional[str] = None
+    git_to: Optional[str] = None
+    git_author: Optional[str] = None
 
     # Threading
     threads: int = 10
     delay: float = 1.0
+    per_host_delay: float = 0.0
+    per_host_concurrency: int = 0
 
     # Network
     proxy: Optional[str] = None
@@ -54,6 +59,7 @@ class ScanConfig:
     exclude_patterns: List[str] = field(default_factory=list)
     allow_external: bool = False  # follow links to other hosts
     respect_robots: bool = False
+    source_maps: bool = False  # discover sourceMappingURL and JS chunks
 
     # HTTP Method
     method: str = "GET"
@@ -74,11 +80,14 @@ class ScanConfig:
     exclude_types: List[str] = field(default_factory=list)
     max_per_rule: int = 5
     ignore_files: List[str] = field(default_factory=list)
+    use_default_ignore: bool = True
     show_context: bool = False
     entropy_scan: bool = False
     entropy_min_length: int = 20
     entropy_scan_threshold: float = 3.5
     audit_github_actions: bool = False
+    gitleaks_configs: List[str] = field(default_factory=list)
+    semgrep_configs: List[str] = field(default_factory=list)
 
     # Active validation
     validate_workers: int = 4
@@ -106,6 +115,12 @@ class ScanConfig:
     baseline_file: Optional[str] = None
     update_baseline: Optional[str] = None
 
+    # Report dashboard
+    serve: bool = False
+    serve_host: str = "127.0.0.1"
+    serve_port: int = 8000
+    open_browser: bool = False
+
     # Anti-detection
     jitter: bool = False
 
@@ -117,6 +132,7 @@ class ScanConfig:
 
     # Plugin
     plugin_dir: Optional[str] = None
+    entrypoint_plugins: bool = False
 
     @classmethod
     def from_dict(cls, d: dict) -> "ScanConfig":
@@ -160,6 +176,8 @@ class ScanConfig:
         self.paths = [str(p) for p in (self.paths or [])]
         self.js_files = [str(js) for js in (self.js_files or [])]
         self.custom_pattern_files = [str(p) for p in (self.custom_pattern_files or [])]
+        self.gitleaks_configs = [str(p) for p in (self.gitleaks_configs or [])]
+        self.semgrep_configs = [str(p) for p in (self.semgrep_configs or [])]
         self.ignore_files = [str(p) for p in (self.ignore_files or [])]
         self.exclude_patterns = [str(p) for p in (self.exclude_patterns or [])]
         self.include_types = [str(t) for t in (self.include_types or [])]
@@ -170,6 +188,11 @@ class ScanConfig:
 
         self.threads = max(1, min(100, int(self.threads)))
         self.delay = max(0.0, min(100.0, float(self.delay)))
+        self.per_host_delay = max(0.0, min(300.0, float(self.per_host_delay)))
+        self.per_host_concurrency = max(0, min(100, int(self.per_host_concurrency)))
+        self.serve_port = max(1, min(65535, int(self.serve_port)))
+        if self.serve and "html" not in self.output_format:
+            self.output_format.append("html")
         self.max_per_rule = max(1, int(self.max_per_rule))
         self.validate_workers = max(1, min(32, int(self.validate_workers)))
         self.validate_max = max(0, int(self.validate_max))

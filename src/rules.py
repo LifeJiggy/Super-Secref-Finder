@@ -10,6 +10,11 @@ Every detection is a :class:`Rule` with metadata:
 * ``entropy_min``   optional Shannon-entropy floor for the captured value
 * ``noise``         opt-in only (code smells, not secrets)
 * ``pii``           opt-in only (emails, phones, ...)
+* ``path_include``  optional file/URL globs where the rule applies
+* ``path_exclude``  optional file/URL globs where the rule is skipped
+* ``negative_pattern`` optional regex that suppresses a match (Semgrep
+  ``pattern-not-regex`` compatibility)
+* ``fix``           optional human-readable remediation/suggestion
 
 Rules were deliberately curated: high-signal defaults, noisy patterns behind
 ``--include-noise`` / ``--include-pii``.
@@ -17,7 +22,9 @@ Rules were deliberately curated: high-signal defaults, noisy patterns behind
 
 from __future__ import annotations
 
+import fnmatch
 import re
+import urllib.parse
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -50,7 +57,12 @@ class Rule:
     noise: bool = False
     pii: bool = False
     tags: Tuple[str, ...] = ()
+    path_include: Tuple[str, ...] = ()
+    path_exclude: Tuple[str, ...] = ()
+    negative_pattern: Optional[str] = None
+    fix: Optional[str] = None
     compiled: Optional[re.Pattern] = field(default=None, compare=False, repr=False)
+    compiled_negative: Optional[re.Pattern] = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.severity not in SEVERITIES:
@@ -62,7 +74,39 @@ class Rule:
         """Compile the pattern once (idempotent)."""
         if self.compiled is None:
             self.compiled = re.compile(self.pattern, re.MULTILINE)
+        if self.negative_pattern and self.compiled_negative is None:
+            self.compiled_negative = re.compile(self.negative_pattern, re.MULTILINE)
         return self
+
+    def matches_path(self, target: str) -> bool:
+        """Return True when path include/exclude globs allow this target.
+
+        Semgrep path globs are commonly written relative to the repository root
+        (``tests/**``), while local scans use absolute file URLs. We therefore
+        test the full normalized path and every trailing path segment so both
+        forms work.
+        """
+        if not self.path_include and not self.path_exclude:
+            return True
+
+        path = _target_path(target)
+        if not path:
+            return True
+
+        if self.path_include and not _any_glob(path, self.path_include):
+            return False
+        if self.path_exclude and _any_glob(path, self.path_exclude):
+            return False
+        return True
+
+    def is_negative_match(self, value: str, whole_match: str = "") -> bool:
+        """Return True when a Semgrep-style negative pattern excludes the match."""
+        if self.compiled_negative is None:
+            return False
+        return bool(
+            self.compiled_negative.search(value)
+            or (whole_match and self.compiled_negative.search(whole_match))
+        )
 
     def value_span(self, match: re.Match) -> Tuple[int, int]:
         """Return the span of the *secret* (capture group when available)."""
@@ -79,6 +123,40 @@ class Rule:
         return match.string[start:end]
 
 
+def _target_path(target: str) -> str:
+    """Normalize a file path or URL into a POSIX path for glob matching."""
+    if not target:
+        return ""
+    text = str(target).strip()
+    if text.startswith("file://"):
+        text = urllib.parse.unquote(urllib.parse.urlparse(text).path)
+    elif "://" in text:
+        text = urllib.parse.urlparse(text).path
+    return text.replace("\\", "/").lstrip("./")
+
+
+def _any_glob(path: str, patterns: Iterable[str]) -> bool:
+    candidates = {path}
+    parts = [part for part in path.split("/") if part]
+    for index in range(1, len(parts)):
+        candidates.add("/".join(parts[index:]))
+
+    for raw in patterns:
+        pattern = str(raw).replace("\\", "/").strip()
+        if not pattern:
+            continue
+        if pattern.startswith("./"):
+            pattern = pattern[2:]
+        variants = {pattern}
+        if pattern.startswith("**/"):
+            variants.add(pattern[3:])
+        for candidate in candidates:
+            for variant in variants:
+                if fnmatch.fnmatch(candidate, variant):
+                    return True
+    return False
+
+
 def R(
     rule_id: str,
     pattern: str,
@@ -90,6 +168,10 @@ def R(
     noise: bool = False,
     pii: bool = False,
     tags: Iterable[str] = (),
+    path_include: Iterable[str] = (),
+    path_exclude: Iterable[str] = (),
+    negative_pattern: Optional[str] = None,
+    fix: Optional[str] = None,
 ) -> Rule:
     """Compact rule constructor."""
     return Rule(
@@ -103,6 +185,10 @@ def R(
         noise=noise,
         pii=pii,
         tags=tuple(tags),
+        path_include=tuple(path_include),
+        path_exclude=tuple(path_exclude),
+        negative_pattern=negative_pattern,
+        fix=fix,
     )
 
 
@@ -187,7 +273,7 @@ BUILTIN_RULES: List[Rule] = [
       "token", "high", "npm access token"),
     R("pypi_token", r"\bpypi-[A-Za-z0-9_\-]{40,}\b",
       "token", "high", "PyPI upload token"),
-    R("github_actions_secret", r"(?i)\bsecrets\.[A-Z0-9_]+\b",
+    R("github_actions_secret", r"\bsecrets\.[A-Z][A-Z0-9_]*\b",
       "supply-chain", "info", "GitHub Actions secret reference (not a value)"),
     R("npmrc_auth_token",
       r"(?i)//(?:registry\.npmjs\.org|npm\.pkg\.dev)[^\s]*:_authToken\s*=\s*([^\s]+)",
@@ -304,7 +390,7 @@ BUILTIN_RULES: List[Rule] = [
       "exposure", "medium", "Firebase client configuration"),
     R("firebase_url", r"https?://[a-z0-9\-]+\.firebaseio\.com",
       "exposure", "low", "Firebase realtime-database URL"),
-    R("supabase_url", r"https?://[a-z0-9\-]+\.supabase\.co",
+    R("supabase_url", r"https?://[a-z0-9\-]{10,}\.supabase\.co\b",
       "exposure", "low", "Supabase project URL"),
     R("s3_bucket_url", r"https?://[a-z0-9.\-]+\.s3(?:[.-][a-z0-9\-]+)?\.amazonaws\.com",
       "exposure", "low", "S3 bucket reference"),
@@ -465,4 +551,9 @@ def validate_rule_metadata() -> List[str]:
             problems.append(f"{rule.id}: secret_group {rule.secret_group} > {groups} groups")
         if rule.noise and rule.pii:
             problems.append(f"{rule.id}: cannot be both noise and pii")
+        if rule.negative_pattern:
+            try:
+                re.compile(rule.negative_pattern)
+            except re.error as exc:
+                problems.append(f"{rule.id}: invalid negative_pattern: {exc}")
     return problems
