@@ -23,7 +23,7 @@ inputs:
     required: false
     default: ""
   version:
-    description: "Package version to install (blank = latest)"
+    description: "PyPI version to install (blank = install this action's checkout)"
     required: false
     default: ""
   upload-sarif:
@@ -43,7 +43,7 @@ runs:
         if [ -n "$INPUT_VERSION" ]; then
           python -m pip install "super-secref-finder==$INPUT_VERSION"
         else
-          python -m pip install super-secref-finder
+          python -m pip install "$GITHUB_ACTION_PATH"
         fi
 
     - name: Scan

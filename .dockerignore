@@ -28,3 +28,10 @@ findings_*.junit
 .secref-baseline.json
 .secref_checkpoint.json
 scan_results.json
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx

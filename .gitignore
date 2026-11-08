@@ -61,6 +61,10 @@ desktop.ini
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Historical local notes. This folder has contained live credentials in the past;
 # clean and review it before removing this ignore rule.

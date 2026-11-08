@@ -1,6 +1,6 @@
 # Super Secref Finder
 
-### High-signal secret scanning for web apps, JavaScript bundles, and local files.
+### High-signal secret scanning for code, GitHub repositories, web apps, and CI.
 
 [![CI](https://github.com/LifeJiggy/Super-Secref-Finder/actions/workflows/ci.yml/badge.svg)](https://github.com/LifeJiggy/Super-Secref-Finder/actions/workflows/ci.yml)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
@@ -11,11 +11,14 @@
 
 Most regex secret scanners are noisy. They flag every 32-character string, every UUID,
 every `<script>` tag, and every `../` path, then leave you to triage hundreds of
-non-findings. **Super Secref Finder v8 is built around one rule: signal over noise.**
+non-findings. **Super Secref Finder v8.1 is built around one rule: signal over noise.**
 
-It scans web pages, linked JavaScript, local repositories, and stdin, but only reports
-findings that have a plausible secret shape, context, and severity. Code smells, PII,
-and endpoint discovery are opt-in.
+It scans live GitHub repositories and organizations, git history, staged changes,
+web pages, linked JavaScript, local repositories, and stdin — but only reports
+findings that have a plausible secret shape, context, and severity. Code smells,
+PII, generic entropy, and endpoint discovery are opt-in.
+
+**Current version:** `8.1.0` — see [CHANGELOG.md](CHANGELOG.md).
 
 ```text
 $ secref --path . --min-severity high
@@ -27,9 +30,9 @@ CRITICAL  database_uri_with_credentials  src/.env:4
 
 ---
 
-## Why v8 is different
+## Why v8.1 is different
 
-| Problem in v7 | What v8 does |
+| Problem in v7 | What v8.1 does |
 |---|---|
 | 35 findings, 0 real secrets on a real site | 79 curated default rules; broad UUID/32-char rules rewritten with context |
 | `inline_script`, `path_traversal`, `console.log` in every report | Code smells moved behind `--include-noise` |
@@ -383,13 +386,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: LifeJiggy/Super-Secref-Finder@v8
+      - uses: LifeJiggy/Super-Secref-Finder@main
         with:
           path: "."
           formats: "json sarif"
           fail-on: high
           args: "--min-severity medium"
 ```
+
+> The action currently tracks `main` because `v8.1.0` is not tagged yet. Once a
+> release tag exists, pin the action to that tag for reproducible CI.
 
 Or run the CLI directly:
 
@@ -419,7 +425,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/LifeJiggy/Super-Secref-Finder
-    rev: v8.1.0
+    rev: main  # replace with v8.1.0 once the release tag is published
     hooks:
       - id: secref
       - id: secref-workflow-audit
@@ -578,9 +584,14 @@ The CI workflow runs the test suite on Python 3.8-3.13 and a lint pass.
 ## Security
 
 This is a defensive tool. Live validation is **read-only**, allow-listed, and
-disabled by `--safe-mode`. Baselines store salted fingerprints instead of raw
+disabled by `--safe-mode`. Baselines store hashed fingerprints instead of raw
 secrets. Reports can contain real credentials: treat them as sensitive and use
 `--redact` when sharing.
+
+Keep credentials local. `.env`, `Docs/`, generated reports, and scan artifacts
+are ignored by git and Docker. Pass provider tokens through environment
+variables (`GITHUB_TOKEN`, `GH_TOKEN`) or `--github-token`; never commit them
+to the repository.
 
 Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
