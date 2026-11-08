@@ -1,0 +1,51 @@
+# Custom rules for Super Secref Finder v8
+#
+# Usage:
+#   super-secref-finder --path . --custom-patterns custom_patterns.yaml
+#   super-secref-finder https://target.test --custom-patterns custom_patterns.yaml
+#
+# Each entry supports:
+#   regex       (required) regular expression
+#   description (optional) human-readable name shown in reports
+#   severity    critical | high | medium | low | info   (default: medium)
+#   category    secret | cloud | credential | token | exposure | endpoint |
+#               pii | supply-chain | code-risk | config | custom (default: custom)
+#   group       capture group holding the secret value (default: 0 = whole match)
+#   entropy     minimum Shannon entropy for the captured value (default: 0)
+#   noise       true = only run with --include-noise (default: false)
+#   pii         true = only run with --include-pii (default: false)
+#
+# Tip: add `# secref:ignore` on a line to suppress a single match.
+
+patterns:
+  internal_api_key:
+    regex: "(?i)\\binternal[_-]?api[_-]?key\\s*[:=]\\s*['\"]([A-Za-z0-9]{32,})['\"]"
+    description: "Internal API key"
+    severity: high
+    category: secret
+    group: 1
+    entropy: 3.0
+
+  custom_auth_token:
+    regex: "\\b(?:AUTH|TOKEN)_[A-Z0-9]{20,}\\b"
+    description: "Custom authentication token"
+    severity: high
+    category: token
+
+  database_url:
+    regex: "(?i)database[_-]?url\\s*[:=]\\s*['\"]([^'\"]+)['\"]"
+    description: "Database connection URL"
+    severity: critical
+    category: credential
+    group: 1
+
+  # Simple string form is still supported (defaults to medium/custom).
+  legacy_simple_pattern: "LEGACY-[0-9]{8}"
+
+  # Opt-in example: only runs with --include-noise.
+  internal_debug_marker:
+    regex: "INTERNAL_DEBUG_[A-Z]{6,}"
+    description: "Internal debug marker"
+    severity: info
+    category: code-risk
+    noise: true

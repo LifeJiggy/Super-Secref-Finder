@@ -1,0 +1,71 @@
+name: "Super Secref Finder"
+description: "High-signal secret scanning for repositories, web apps, and JavaScript bundles."
+author: "LifeJiggy"
+branding:
+  icon: "shield"
+  color: "purple"
+
+inputs:
+  path:
+    description: "Path to scan (default: repository root)"
+    required: false
+    default: "."
+  formats:
+    description: "Space-separated output formats (json, sarif, html, junit, ...)"
+    required: false
+    default: "json sarif"
+  fail-on:
+    description: "Fail the job at or above this severity"
+    required: false
+    default: "high"
+  args:
+    description: "Extra CLI arguments (for example: --include-pii --git-history)"
+    required: false
+    default: ""
+  version:
+    description: "Package version to install (blank = latest)"
+    required: false
+    default: ""
+  upload-sarif:
+    description: "Upload SARIF to GitHub code scanning"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Super Secref Finder
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        python -m pip install --upgrade pip
+        if [ -n "$INPUT_VERSION" ]; then
+          python -m pip install "super-secref-finder==$INPUT_VERSION"
+        else
+          python -m pip install super-secref-finder
+        fi
+
+    - name: Scan
+      shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_FORMATS: ${{ inputs.formats }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_ARGS: ${{ inputs.args }}
+      run: |
+        read -r -a FORMATS <<< "$INPUT_FORMATS"
+        mkdir -p "$RUNNER_TEMP/secref-reports"
+        # shellcheck disable=SC2086
+        secref --path "$INPUT_PATH" \
+          --format "${FORMATS[@]}" \
+          --fail-on "$INPUT_FAIL_ON" \
+          $INPUT_ARGS \
+          -o "$RUNNER_TEMP/secref-reports"
+
+    - name: Upload SARIF
+      if: always() && inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ runner.temp }}/secref-reports
+        category: super-secref-finder

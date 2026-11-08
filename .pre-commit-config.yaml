@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.7
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^(src|tests|scripts)/
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: pytest -q
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: rules-doc
+        name: regenerate RULES.md
+        entry: python scripts/generate_rules_doc.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: no-secrets
+        name: scan staged files with secref
+        entry: secref --path
+        language: system
+        pass_filenames: true
+        stages: [pre-commit]

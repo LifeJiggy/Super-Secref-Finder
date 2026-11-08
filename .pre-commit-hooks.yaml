@@ -1,0 +1,15 @@
+- id: secref
+  name: Super Secref Finder (staged files)
+  description: Scan staged files for secrets and fail on high severity.
+  entry: secref --staged --fail-on high -q
+  language: python
+  types: [text]
+  pass_filenames: false
+
+- id: secref-workflow-audit
+  name: Super Secref Finder (staged files + workflow audit)
+  description: Scan staged files and GitHub Actions workflows.
+  entry: secref --staged --audit-github-actions --fail-on high -q
+  language: python
+  types: [text]
+  pass_filenames: false

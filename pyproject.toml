@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "super-secref-finder"
-version = "6.0.0"
-description = "A powerful tool designed to perform regex pattern matching to identify sensitive information in various data sources."
+version = "8.1.0"
+description = "High-signal secret scanner for web apps, JavaScript bundles, and local files — 128 rules, severity, SARIF, CI exit codes."
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.8"
@@ -15,11 +15,15 @@ authors = [
 maintainers = [
     {name = "ArkhAngelLifeJiggy", email = "Bloomtonjovish@gmail.com"},
 ]
-keywords = ["security", "regex", "sensitive-data", "scanner"]
+keywords = [
+    "security", "secrets", "secret-scanning", "sast", "regex",
+    "api-key", "credential", "pentest", "sarif", "devsecops",
+]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -28,36 +32,74 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
     "Topic :: Utilities",
 ]
 dependencies = [
-    "regex",
-    "requests",
-    "jsonschema",
+    "requests>=2.28.0",
+    "colorama>=0.4.6",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
-    "pytest-cov",
-    "black",
-    "flake8",
-    "mypy",
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.5",
+    "build>=1.0",
+    "twine>=5.0",
+]
+aws = [
+    "boto3>=1.26",
+]
+all = [
+    "boto3>=1.26",
 ]
 
 [project.urls]
 Homepage = "https://github.com/LifeJiggy/Super-Secref-Finder"
 Repository = "https://github.com/LifeJiggy/Super-Secref-Finder"
+Documentation = "https://github.com/LifeJiggy/Super-Secref-Finder#readme"
 Issues = "https://github.com/LifeJiggy/Super-Secref-Finder/issues"
 Changelog = "https://github.com/LifeJiggy/Super-Secref-Finder/blob/main/CHANGELOG.md"
+Security = "https://github.com/LifeJiggy/Super-Secref-Finder/blob/main/SECURITY.md"
 
 [project.scripts]
-super-secref-finder = "super_secref_finder.Regex_patterns:main"
+super-secref-finder = "src.__main__:main"
+secref = "src.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["super_secref_finder*"]
+include = ["src*"]
 
 [tool.setuptools.package-data]
-src = ["*.txt", "*.md"]
+src = ["*.yaml", "*.yml", "py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"
+exclude = [".git", "build", "dist", "*.egg-info"]
+
+[tool.ruff.lint]
+select = ["E9", "F", "W6"]
+ignore = ["F401"]

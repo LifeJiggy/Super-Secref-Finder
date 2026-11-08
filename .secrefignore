@@ -1,0 +1,5 @@
+# Test fixtures and examples intentionally contain synthetic token shapes.
+# Keep the project's own scans focused on real source.
+path: */tests/*
+path: */examples/*
+path: */Docs/*

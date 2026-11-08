@@ -1,0 +1,12 @@
+# Example custom rules for Super Secref Finder.
+# See src/custom_patterns_example.yaml for the full schema.
+patterns:
+  example_internal_key:
+    regex: "(?i)\\bEXAMPLE_INTERNAL_KEY\\s*[:=]\\s*['\"]([A-Za-z0-9]{32,})['\"]"
+    description: "Example internal API key"
+    severity: high
+    category: secret
+    group: 1
+    entropy: 3.0
+
+  example_legacy_pattern: "EXAMPLE-LEGACY-[0-9]{8}"

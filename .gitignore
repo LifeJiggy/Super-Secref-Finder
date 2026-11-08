@@ -1,0 +1,67 @@
+# Byte-compiled / caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# Scan artifacts
+secref.log
+secref_*.log
+secref.log.*
+findings_*.json
+findings_*.jsonl
+findings_*.csv
+findings_*.md
+findings_*.html
+findings_*.sarif
+findings_*.xml
+findings_*.junit
+scan_results.json
+findings.json
+.secref_checkpoint.json
+.secref_checkpoint.json.tmp
+.secref-baseline.json
+reports/
+
+# Project-specific allowlist is usually committed; local overrides are not.
+.secrefignore.local
+
+# Editors / OS
+.idea/
+.vscode/
+.vs/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Historical local notes. This folder has contained live credentials in the past;
+# clean and review it before removing this ignore rule.
+Docs/
